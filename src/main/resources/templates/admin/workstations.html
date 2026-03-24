@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/admin-include :: head('Admin — Workstation Control')}">
+    <title>Admin — Workstation Control</title>
+</head>
+<body class="bg-gray-50 text-gray-900 h-screen overflow-hidden flex flex-col antialiased font-sans text-base">
+
+<th:block th:replace="~{fragments/admin-include :: pageHeader}"/>
+
+<div class="flex-1 flex min-h-0 max-w-7xl w-full mx-auto px-6 py-4 md:py-6 gap-8">
+    <th:block th:replace="~{fragments/admin-include :: sidebar('workstations')}"/>
+
+    <main class="uc-page-enter flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0 mb-4">
+            <div>
+                <h2 class="text-2xl font-medium tracking-tight text-gray-900">Workstations</h2>
+            </div>
+            <a th:href="@{/admin/workstations/new}"
+               class="uc-motion inline-flex items-center justify-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-base font-normal text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 shadow-sm shrink-0">
+                <iconify-icon icon="solar:add-circle-linear" class="text-xl"></iconify-icon>
+                Add Workstation
+            </a>
+        </div>
+
+        <p th:if="${message}" class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 shrink-0 mb-4" th:text="${message}">Saved</p>
+
+        <p th:if="${workstations.isEmpty()}" class="text-gray-500 shrink-0">No workstations yet. Add one to get started.</p>
+
+        <div th:if="${!workstations.isEmpty()}" class="flex-1 min-h-0 flex flex-col">
+            <div class="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+                <table class="w-full max-w-full table-fixed text-left border-collapse">
+                    <!-- E / Leader / Quality: equal width; Actions fixed for icon pair. -->
+                    <colgroup>
+                        <col style="width:6%"/>
+                        <col style="width:12%"/>
+                        <col style="width:24%"/>
+                        <col style="width:24%"/>
+                        <col style="width:24%"/>
+                        <col style="width:10%"/>
+                    </colgroup>
+                    <thead class="sticky top-0 z-10">
+                    <tr class="bg-gray-50/95 backdrop-blur-sm border-b border-gray-200 shadow-sm">
+                        <th class="px-2 py-2.5 text-[10px] sm:text-xs font-normal text-gray-500 uppercase tracking-wider text-center leading-tight whitespace-nowrap">Order</th>
+                        <th class="px-2 py-2.5 text-[10px] sm:text-xs font-normal text-gray-500 uppercase tracking-wider leading-tight whitespace-nowrap">Name</th>
+                        <th class="px-2 py-2.5 text-[10px] sm:text-xs font-normal text-gray-500 uppercase tracking-wider leading-tight">Engineering</th>
+                        <th class="px-2 py-2.5 text-[10px] sm:text-xs font-normal text-gray-500 uppercase tracking-wider leading-tight">Leader</th>
+                        <th class="px-2 py-2.5 text-[10px] sm:text-xs font-normal text-gray-500 uppercase tracking-wider leading-tight">Quality checker</th>
+                        <th class="px-2 py-2.5 text-[10px] sm:text-xs font-normal text-gray-500 text-right uppercase tracking-wider leading-tight">Actions</th>
+                    </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                    <tr th:each="w : ${workstations}"
+                        th:with="slots=${slotRows.get(w.id)},e=${slots != null and slots.size() > 0 ? slots.get(0) : null},l=${slots != null and slots.size() > 1 ? slots.get(1) : null},q=${slots != null and slots.size() > 2 ? slots.get(2) : null}"
+                        class="uc-motion hover:bg-gray-50/50">
+                        <td class="px-2 py-2.5 text-sm font-normal text-gray-500 align-middle text-center tabular-nums" th:text="${w.sortOrder}">1</td>
+                        <td class="px-2 py-3 align-middle min-w-0">
+                            <div class="min-w-0 truncate" th:title="${w.name}">
+                                <span class="text-sm sm:text-base font-medium text-gray-900 tracking-tight" th:text="${w.name} ?: '—'">Name</span>
+                                <span th:if="${!w.enabled}" class="ml-1 inline-flex items-center rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-600">Disabled</span>
+                            </div>
+                        </td>
+                        <td class="px-2 py-2.5 align-middle min-w-0 overflow-hidden">
+                            <th:block th:replace="~{fragments/admin-include :: roleCell(${e}, 'amber')}"></th:block>
+                        </td>
+                        <td class="px-2 py-2.5 align-middle min-w-0 overflow-hidden">
+                            <th:block th:replace="~{fragments/admin-include :: roleCell(${l}, 'emerald')}"></th:block>
+                        </td>
+                        <td class="px-2 py-2.5 align-middle min-w-0 overflow-hidden">
+                            <th:block th:replace="~{fragments/admin-include :: roleCell(${q}, 'red')}"></th:block>
+                        </td>
+                        <td class="px-2 py-2.5 align-middle text-right whitespace-nowrap">
+                            <div class="inline-flex items-center justify-end gap-0.5">
+                                <a th:href="@{/admin/workstations/{id}/edit(id=${w.id})}"
+                                   class="uc-motion p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md border border-transparent hover:border-gray-200"
+                                   title="Edit Workstation">
+                                    <iconify-icon icon="solar:pen-linear" class="text-lg"></iconify-icon>
+                                </a>
+                                <form th:id="${'ws-del-form-' + w.id}"
+                                      th:action="@{/admin/workstations/{id}/delete(id=${w.id})}" method="post" class="inline">
+                                    <button type="button"
+                                            class="uc-motion js-ws-delete-open p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-md border border-transparent hover:border-red-100"
+                                            title="Delete Workstation"
+                                            th:data-form-id="${'ws-del-form-' + w.id}"
+                                            th:data-ws-name="${w.name != null and not #strings.isEmpty(w.name) ? w.name : 'Workstation'}">
+                                        <iconify-icon icon="solar:trash-bin-trash-linear" class="text-lg"></iconify-icon>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- Delete confirmation modal -->
+<div id="ws-delete-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="ws-delete-title">
+    <div id="ws-delete-backdrop" class="absolute inset-0 bg-gray-900/45 backdrop-blur-[1px]"></div>
+    <div class="relative w-full max-w-md rounded-2xl border border-gray-200 bg-white shadow-2xl overflow-hidden">
+        <div class="px-6 pt-6 pb-2">
+            <div class="flex items-start gap-3">
+                <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-50 border border-red-100">
+                    <iconify-icon icon="solar:danger-triangle-linear" class="text-2xl text-red-600"></iconify-icon>
+                </div>
+                <div class="min-w-0 flex-1">
+                    <h3 id="ws-delete-title" class="text-lg font-medium text-gray-900 tracking-tight">Delete workstation?</h3>
+                    <p class="mt-2 text-sm text-gray-600 leading-relaxed">
+                        <span class="text-gray-500">You are about to remove</span>
+                        <span id="ws-delete-name" class="font-semibold text-gray-900"></span>.
+                        <span class="text-gray-500">This cannot be undone.</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="flex items-center justify-end gap-2 px-6 py-4 bg-gray-50/80 border-t border-gray-100">
+            <button type="button" id="ws-delete-cancel"
+                    class="uc-motion px-4 py-2.5 rounded-lg text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 shadow-sm">
+                Cancel
+            </button>
+            <button type="button" id="ws-delete-confirm"
+                    class="uc-motion px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 shadow-sm">
+                Delete workstation
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    var modal = document.getElementById('ws-delete-modal');
+    var backdrop = document.getElementById('ws-delete-backdrop');
+    var nameEl = document.getElementById('ws-delete-name');
+    var cancelBtn = document.getElementById('ws-delete-cancel');
+    var confirmBtn = document.getElementById('ws-delete-confirm');
+    var pendingForm = null;
+
+    function openModal(formId, displayName) {
+        pendingForm = document.getElementById(formId);
+        if (!pendingForm) return;
+        nameEl.textContent = displayName || 'this workstation';
+        modal.classList.remove('hidden');
+        document.body.classList.add('overflow-hidden');
+        confirmBtn.focus();
+    }
+
+    function closeModal() {
+        modal.classList.add('hidden');
+        document.body.classList.remove('overflow-hidden');
+        pendingForm = null;
+    }
+
+    document.querySelectorAll('.js-ws-delete-open').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            openModal(btn.getAttribute('data-form-id'), btn.getAttribute('data-ws-name'));
+        });
+    });
+
+    cancelBtn.addEventListener('click', closeModal);
+    backdrop.addEventListener('click', closeModal);
+
+    confirmBtn.addEventListener('click', function () {
+        if (pendingForm) pendingForm.submit();
+        closeModal();
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
+            closeModal();
+        }
+    });
+})();
+</script>
+</body>
+</html>

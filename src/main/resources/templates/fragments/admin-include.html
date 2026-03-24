@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:fragment="head (pageTitle)">
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title th:text="${pageTitle}">Admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" th:href="@{/css/andon.css}"/>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #d1d5db; }
+        iconify-icon { display: inline-block; vertical-align: middle; }
+    </style>
+</head>
+
+<header th:fragment="pageHeader" class="bg-white border-b border-gray-200 shrink-0 z-30">
+    <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+        <div class="flex items-center gap-4 min-w-0">
+            <img th:src="@{/images/app-logo.svg}" alt="App Logo" class="w-14 h-14 shrink-0"/>
+            <div class="flex flex-col justify-center min-w-0">
+                <h1 class="text-xl font-medium tracking-tight leading-tight text-slate-900 truncate">Unicharm India Pvt. Ltd.</h1>
+                <p class="text-sm font-normal text-slate-500 mt-0.5 truncate">Sri City Central Expressway, Sector 24</p>
+            </div>
+        </div>
+        <a th:href="@{/}" class="uc-motion text-base font-normal text-gray-500 hover:text-gray-900 flex items-center gap-2 shrink-0">
+            <iconify-icon icon="solar:monitor-linear" class="text-xl"></iconify-icon>
+            <span class="hidden sm:inline">Return to Dashboard</span>
+        </a>
+    </div>
+</header>
+
+<aside th:fragment="sidebar (active)" class="w-full md:w-64 shrink-0 space-y-1">
+    <h2 class="px-3 text-sm font-medium text-gray-400 uppercase tracking-wider mb-3">Administration</h2>
+    <a th:href="@{/admin/workstations}"
+       th:classappend="${active == 'workstations'} ? ' bg-gray-900 text-white shadow-sm' : ' text-gray-600 hover:bg-gray-100'"
+       class="uc-motion flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-normal">
+        <iconify-icon icon="solar:server-square-linear" class="text-xl" th:classappend="${active == 'workstations'} ? 'text-gray-300' : 'text-gray-400'"></iconify-icon>
+        Workstations
+    </a>
+    <a th:href="@{/admin/event-log}"
+       th:classappend="${active == 'event-log'} ? ' bg-gray-900 text-white shadow-sm' : ' text-gray-600 hover:bg-gray-100'"
+       class="uc-motion flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-normal">
+        <iconify-icon icon="solar:download-linear" class="text-xl" th:classappend="${active == 'event-log'} ? 'text-gray-300' : 'text-gray-400'"></iconify-icon>
+        Download Event Log
+    </a>
+</aside>
+
+<th:block th:fragment="roleCell (slot, tone)">
+    <div th:if="${slot != null}" class="flex items-center gap-1.5 min-w-0">
+        <span th:class="${'w-5 h-5 sm:w-6 sm:h-6 shrink-0 rounded flex items-center justify-center text-xs sm:text-sm font-semibold ' + (tone == 'amber' ? 'bg-amber-100 text-amber-800' : (tone == 'emerald' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'))}"
+              th:title="${tone == 'amber' ? 'Engineering' : (tone == 'emerald' ? 'Leader' : 'Quality')}"
+              th:text="${tone == 'amber' ? 'E' : (tone == 'emerald' ? 'L' : 'Q')}">E</span>
+        <span class="text-xs sm:text-sm text-gray-600 truncate min-w-0 leading-snug whitespace-nowrap"
+              th:title="${'Input ' + slot.inputBitIndex + ', slave ' + slot.outputSlaveId + ', relay ' + slot.outputChannel}">
+            <span class="text-gray-500 font-medium">In:</span><span class="text-gray-900 font-semibold tabular-nums" th:text="${slot.inputBitIndex}">0</span><span class="text-gray-300 mx-0.5">/</span><span class="text-gray-500 font-medium">Slv:</span><span class="text-gray-900 font-semibold tabular-nums" th:text="${slot.outputSlaveId}">2</span><span class="text-gray-300 mx-0.5">/</span><span class="text-gray-500 font-medium">Rly:</span><span class="text-gray-900 font-semibold tabular-nums" th:text="${slot.outputChannel}">1</span>
+        </span>
+    </div>
+    <span th:if="${slot == null}" class="text-sm text-gray-400">-</span>
+</th:block>
+</html>

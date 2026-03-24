@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/admin-include :: head('Admin — Download Event Log')}">
+    <title>Download Event Log</title>
+</head>
+<body class="bg-gray-50 text-gray-900 h-screen overflow-hidden flex flex-col antialiased font-sans text-base">
+
+<th:block th:replace="~{fragments/admin-include :: pageHeader}"/>
+
+<div class="flex-1 flex min-h-0 max-w-7xl w-full mx-auto px-6 py-4 md:py-6 gap-8">
+    <th:block th:replace="~{fragments/admin-include :: sidebar('event-log')}"/>
+
+    <main class="uc-page-enter flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
+        <div class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-1 space-y-6">
+            <div class="flex items-center gap-4 mb-2 shrink-0">
+                <a th:href="@{/admin/workstations}" class="uc-motion p-2 -ml-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg" title="Back to Workstations">
+                    <iconify-icon icon="solar:arrow-left-linear" class="text-2xl"></iconify-icon>
+                </a>
+                <div>
+                    <h2 class="text-2xl font-medium tracking-tight text-gray-900">Download Event Log</h2>
+                    <p class="text-base font-normal text-gray-500 mt-1">Export system events as CSV for the selected date range.</p>
+                </div>
+            </div>
+
+            <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden max-w-2xl">
+                <form th:action="@{/report/export.csv}" method="get" class="p-6 sm:p-8 space-y-6">
+                    <div class="bg-blue-50/50 border border-blue-100 rounded-lg p-4 flex items-start gap-3">
+                        <iconify-icon icon="solar:info-circle-linear" class="text-xl text-blue-500 shrink-0 mt-0.5"></iconify-icon>
+                        <p class="text-sm font-normal text-blue-800">
+                            Select a date range to export system events.
+                            <span class="font-medium">Maximum allowed range is the latest <span th:text="${maxRangeDays}">30</span> days.</span>
+                        </p>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                        <div class="space-y-1.5">
+                            <label for="from-date" class="block text-sm font-medium text-gray-700">From Date</label>
+                            <input type="date" name="start" id="from-date" required
+                                   th:value="${defaultStart}"
+                                   class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900 focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 uc-motion"/>
+                        </div>
+                        <div class="space-y-1.5">
+                            <label for="to-date" class="block text-sm font-medium text-gray-700">To Date</label>
+                            <input type="date" name="end" id="to-date" required
+                                   th:value="${defaultEnd}"
+                                   class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900 focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 uc-motion"/>
+                        </div>
+                    </div>
+                    <div class="pt-2 flex items-center justify-end gap-3 border-t border-gray-100">
+                        <button type="submit" class="uc-motion inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-900 text-base font-normal text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 shadow-sm">
+                            <iconify-icon icon="solar:download-linear" class="text-xl"></iconify-icon>
+                            Download CSV
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </main>
+</div>
+</body>
+</html>

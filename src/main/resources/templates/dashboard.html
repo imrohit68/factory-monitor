@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="en" class="antialiased" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Industrial Andon Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" th:href="@{/css/andon.css}"/>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+        /* Production matrix — matches physical board: 4×17, thick black grid */
+        .andon-matrix-table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 5px solid #000;
+            table-layout: fixed;
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-weight: 700;
+            background: #fff;
+        }
+        .andon-matrix-table th,
+        .andon-matrix-table td {
+            border: 5px solid #000;
+            box-sizing: border-box;
+            vertical-align: middle;
+            text-align: center;
+        }
+        .andon-matrix-table thead th {
+            background: #fff;
+            color: #000;
+            font-size: clamp(0.85rem, 1.5vw, 1.1rem);
+            padding: 0.35rem 0.2rem;
+            min-height: 2.75rem;
+        }
+        /* Top-left: column vs row header labels, diagonal split (physical board style) */
+        .andon-matrix-table thead th.andon-matrix__corner {
+            position: relative;
+            width: 14%;
+            min-width: 6.75rem;
+            max-width: 10rem;
+            min-height: 4.5rem;
+            padding: 0;
+            vertical-align: middle;
+            background: #e5e7eb;
+            overflow: hidden;
+        }
+        /* Diagonal: top-right → bottom-left (opposite to the usual TL–BR) */
+        .andon-matrix__corner::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(
+                to bottom left,
+                transparent calc(50% - 1.5px),
+                #000 50%,
+                transparent calc(50% + 1.5px)
+            );
+            pointer-events: none;
+            z-index: 1;
+        }
+        .andon-matrix__corner-inner {
+            position: relative;
+            z-index: 2;
+            min-height: 4.25rem;
+            height: 100%;
+        }
+        /* Keep upper text to the right side of the corner. */
+        .andon-matrix__corner-col {
+            position: absolute;
+            top: 0.32rem;
+            right: 0.32rem;
+            left: 55%;
+            text-align: right;
+            font-size: clamp(0.38rem, 0.7vw, 0.58rem);
+            line-height: 1.12;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            color: #000;
+        }
+        /* Keep lower text to the left side of the corner. */
+        .andon-matrix__corner-row {
+            position: absolute;
+            bottom: 0.32rem;
+            left: 0.32rem;
+            right: 55%;
+            text-align: left;
+            font-size: clamp(0.38rem, 0.7vw, 0.58rem);
+            line-height: 1.12;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            color: #000;
+            display: flex;
+            flex-direction: column;
+            gap: 0.06em;
+        }
+        .andon-matrix__label {
+            text-align: left !important;
+            padding: 0.35rem 0.5rem !important;
+            background: #fff !important;
+            font-weight: 700;
+            min-height: 3.25rem;
+        }
+        .andon-matrix__label-inner {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            gap: 0.35rem;
+            min-height: 2.75rem;
+        }
+        .andon-matrix__label-text {
+            /* Engineering row labels: ENGINEERS / LEADER / QUALITY / CONTROL */
+            font-size: clamp(0.55rem, 1.05vw, 0.80rem);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            line-height: 1.2;
+            color: #000;
+            flex: 1;
+            min-width: 0;
+        }
+        .andon-matrix__label-text--stack {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            justify-content: center;
+        }
+        .andon-matrix__label-letter {
+            font-size: clamp(1.75rem, 4vw, 2.75rem);
+            font-weight: 700;
+            line-height: 1;
+            color: #000;
+            flex-shrink: 0;
+        }
+        .andon-matrix-cell {
+            position: relative;
+            padding: 0 !important;
+            min-height: clamp(2.5rem, 5vw, 3.75rem);
+        }
+        .andon-matrix-cell__hit {
+            min-height: clamp(2.5rem, 5vw, 3.75rem);
+            width: 100%;
+            transition: box-shadow 0.2s ease;
+        }
+        .andon-matrix-cell__fill {
+            box-sizing: border-box;
+            width: 100%;
+            height: 100%;
+            min-height: inherit;
+        }
+        /* Unlit / input low */
+        .andon-matrix-cell--off {
+            background: #d1d5db;
+        }
+        .andon-matrix-cell--e {
+            background: #ffff00;
+        }
+        .andon-matrix-cell--l {
+            background: #4caf50;
+        }
+        .andon-matrix-cell--q {
+            background: #4169e1;
+        }
+        .andon-matrix-scroll {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            background: #fff;
+        }
+    </style>
+</head>
+<body class="bg-[#FAFAFA] text-gray-900 h-screen overflow-hidden flex flex-col">
+
+<!-- Ensures Tailwind CDN includes utilities used only from Vue :class -->
+<div aria-hidden="true" class="hidden font-bold border border-gray-200 bg-gray-50 border-2 border-[#E6D82A] bg-[#FFF23E] border-[#4a9e44] bg-[#63BE5B] border-[#3d42b3] bg-[#4A54CF] hover:brightness-[0.97] brightness-[0.97] border-[#FFF23E]/60 border-[#63BE5B]/60 border-[#4A54CF]/60 bg-[#FFF23E]/20 bg-[#63BE5B]/20 bg-[#4A54CF]/20 text-gray-950 group/row group-hover/row:bg-gray-200 z-[60] hover:z-[35] translate-y-1.5 -translate-y-1.5 mb-1.5 mt-1.5 min-w-[7.5rem] max-w-[10.5rem] left-auto right-0 left-0 right-auto"></div>
+
+<div id="app" class="h-screen flex flex-col min-h-0">
+
+    <!-- Top bar -->
+    <header class="bg-white border-b border-gray-200 px-5 sm:px-8 py-5 sm:py-6 flex items-center justify-between shrink-0 relative z-20 gap-5 sm:gap-7">
+        <div class="flex items-center gap-5 sm:gap-6 min-w-0">
+            <img th:src="@{/images/app-logo.svg}" alt="App Logo" class="w-14 h-14 sm:w-16 sm:h-16 shrink-0"/>
+            <div class="flex flex-col justify-center min-w-0">
+                <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-gray-950 leading-tight truncate">Unicharm India Pvt. Ltd.</h1>
+                <p class="text-sm sm:text-base text-gray-500 font-normal mt-1 truncate">Sri City Central Expressway, Sector 24</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-4 sm:gap-7 shrink-0">
+            <div v-if="modbusConnected" class="hidden sm:inline-flex items-center gap-3 px-4 py-2.5 rounded-full bg-emerald-50 border border-emerald-200 shadow-sm">
+                <span class="relative flex h-3 w-3">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                </span>
+                <span class="text-base font-bold text-emerald-900 tracking-wide">System Online</span>
+            </div>
+            <div v-else class="hidden sm:inline-flex items-center gap-3 px-4 py-2.5 rounded-full bg-amber-50 border border-amber-200 shadow-sm">
+                <span class="relative flex h-3 w-3 rounded-full bg-amber-500"></span>
+                <span class="text-base font-bold text-amber-950 tracking-wide">Modbus disconnected</span>
+            </div>
+
+            <div class="flex items-center gap-3 sm:gap-4">
+                <button
+                        type="button"
+                        class="uc-motion p-3 sm:p-3.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg border border-transparent hover:border-gray-200 flex items-center justify-center"
+                        :title="playingKey != null ? 'Audio playing' : 'Audio idle'">
+                    <img
+                            v-if="playingKey != null"
+                            th:src="@{/images/speaker-playing.png}"
+                            alt="Speaker playing"
+                            class="w-11 h-11 sm:w-12 sm:h-12 shrink-0"/>
+                    <img
+                            v-else
+                            th:src="@{/images/speaker-idle.png}"
+                            alt="Speaker idle"
+                            class="w-11 h-11 sm:w-12 sm:h-12 shrink-0"/>
+                </button>
+                <a th:href="@{/login}" class="uc-motion flex items-center gap-2.5 sm:gap-3 px-5 sm:px-6 py-3 sm:py-3.5 bg-[#111111] text-white rounded-lg hover:bg-black active:scale-[0.98] shadow-sm text-base sm:text-lg font-bold tracking-wide">
+                    <iconify-icon icon="solar:login-2-linear" class="text-xl sm:text-2xl" stroke-width="1.5"></iconify-icon>
+                    <span class="hidden sm:inline">Login</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <p v-if="modbusError" class="shrink-0 px-4 sm:px-6 py-2.5 text-sm font-semibold text-amber-950 bg-amber-50/90 border-b border-amber-100">{{ modbusError }}</p>
+    <p v-if="showAudioGestureHint" class="shrink-0 px-4 sm:px-6 py-2.5 text-sm font-semibold text-blue-950 bg-blue-50/95 border-b border-blue-100 flex items-center gap-2">
+        <iconify-icon icon="solar:volume-loud-linear" class="text-lg shrink-0" stroke-width="1.5"></iconify-icon>
+        <span>Click or tap anywhere on this page to enable alert sounds — browsers block audio until you interact once.</span>
+    </p>
+
+    <main class="uc-page-enter flex-1 w-full max-w-[1920px] mx-auto p-4 md:p-6 lg:p-8 flex flex-col gap-6 lg:gap-8 overflow-y-auto min-h-0">
+
+        <div v-if="workstations.length === 0" class="flex flex-col items-center justify-center py-16 text-center text-gray-500 gap-3">
+            <p class="font-medium">No workstations configured.</p>
+            <a class="uc-motion text-blue-600 hover:underline font-semibold" th:href="@{/admin/workstations/new}">Add a workstation</a>
+        </div>
+
+        <template v-else>
+            <div class="flex-1 flex flex-col items-center justify-center w-full min-h-0 py-2 md:py-4">
+            <div class="andon-matrix-scroll w-full max-w-[min(100%,1600px)] mx-auto min-w-0 rounded-none md:rounded-sm border-0 shadow-none">
+                <table class="andon-matrix-table min-w-[880px]" aria-label="Production andon matrix">
+                    <thead>
+                        <tr>
+                            <th class="andon-matrix__corner" scope="col">
+                                <div class="andon-matrix__corner-inner">
+                                    <span class="andon-matrix__corner-col">Number of machine</span>
+                                    <span class="andon-matrix__corner-row">
+                                        <span>Professional</span>
+                                        <span>Responsible</span>
+                                    </span>
+                                </div>
+                            </th>
+                            <th v-for="ws in workstations" :key="'h-' + ws.id" scope="col">{{ ws.name }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="row in matrixRows" :key="'r-' + row.rowIdx">
+                            <th class="andon-matrix__label" scope="row">
+                                <div class="andon-matrix__label-inner">
+                                    <span
+                                            class="andon-matrix__label-text"
+                                            :class="{ 'andon-matrix__label-text--stack': row.labelStack }">
+                                        <template v-if="row.labelStack">
+                                            <span>{{ row.smallLabel }}</span>
+                                            <span>{{ row.smallLabelLine2 }}</span>
+                                        </template>
+                                        <template v-else>{{ row.smallLabel }}</template>
+                                    </span>
+                                    <span class="andon-matrix__label-letter">{{ row.badgeLetter }}</span>
+                                </div>
+                            </th>
+                            <td
+                                    v-for="(ws, colIdx) in workstations"
+                                    :key="'d-' + row.rowIdx + '-' + ws.id"
+                                    class="andon-matrix-cell group relative hover:z-[35] focus-within:z-[35]">
+                                <div
+                                        :class="[...cellClasses(ws, row.rowIdx), 'andon-matrix-cell__hit', 'w-full']"
+                                        :aria-label="cellAriaLabel(ws, row.rowIdx)"
+                                        role="img"
+                                        tabindex="-1"></div>
+                                <div
+                                        v-if="ws && slotForRow(ws, row.rowIdx)"
+                                        :class="cellTooltipRootClass(row.rowIdx, colIdx)">
+                                    <p class="text-[11px] font-semibold leading-tight text-white">{{ roleDisplayName(slotForRow(ws, row.rowIdx).role) }}</p>
+                                    <dl class="mt-1 space-y-0.5 border-t border-gray-800/90 pt-1">
+                                        <div class="flex items-center justify-between gap-3 text-[9px] leading-tight">
+                                            <dt class="text-gray-500 shrink-0">Bit</dt>
+                                            <dd class="tabular-nums font-medium text-gray-200">{{ slotForRow(ws, row.rowIdx).inputBitIndex }}</dd>
+                                        </div>
+                                        <div class="flex items-center justify-between gap-3 text-[9px] leading-tight">
+                                            <dt class="text-gray-500 shrink-0">Slave</dt>
+                                            <dd class="tabular-nums font-medium text-gray-200">{{ slotForRow(ws, row.rowIdx).outputSlaveId }}</dd>
+                                        </div>
+                                        <div class="flex items-center justify-between gap-3 text-[9px] leading-tight">
+                                            <dt class="text-gray-500 shrink-0">Relay</dt>
+                                            <dd class="tabular-nums font-medium text-gray-200">{{ slotForRow(ws, row.rowIdx).outputChannel }}</dd>
+                                        </div>
+                                    </dl>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            </div>
+        </template>
+    </main>
+</div>
+
+<script th:inline="javascript">
+    /*<![CDATA[*/
+    const boot = {
+        modbusConnected: /*[[${modbusConnected}]]*/ false,
+        modbusError: /*[[${modbusError}]]*/ null
+    };
+    /*]]>*/
+</script>
+<script>
+    const { createApp } = Vue;
+    createApp({
+        data() {
+            return {
+                workstations: [],
+                playingKey: null,
+                playlistIdx: 0,
+                alertGapMs: 400,
+                // Repeat behavior: play the alert once, then repeat after 15 minutes.
+                // (Repeating continues only while there is still active audio.)
+                repeatEveryMs: 15 * 60 * 1000,
+                // Max number of repeats after the initial play.
+                maxAlertRepeats: 4,
+                modbusConnected: !!boot.modbusConnected,
+                modbusError: boot.modbusError || null,
+                matrixRows: [
+                    {
+                        rowIdx: 0,
+                        smallLabel: 'ENGINEERS',
+                        badgeLetter: 'E',
+                        labelStack: false
+                    },
+                    {
+                        rowIdx: 1,
+                        smallLabel: 'LEADER',
+                        badgeLetter: 'L',
+                        labelStack: false
+                    },
+                    {
+                        rowIdx: 2,
+                        smallLabel: 'QUALITY',
+                        smallLabelLine2: 'CONTROL',
+                        badgeLetter: 'Q',
+                        labelStack: true
+                    }
+                ],
+                _currentPlaylist: [],
+                _audioEl: null,
+                _alertGapTimer: null,
+                // Per-audio scheduling state (per active audio item key).
+                _lastPlayedByKey: {},
+                // Queue of due audios to play (no overlap; only one Audio element).
+                _playQueue: [],
+                _queuedKeys: {},
+                // Snapshot of currently active audios by key (updated on each sync()).
+                _activeAudioByKey: {},
+                // Per-audio replay timers started after playback ends.
+                _replayTimerByKey: {},
+                // Number of repeats already queued/played per active key (resets on OFF->ON).
+                _replayCountByKey: {},
+                _pollInterval: null,
+                _visibilityHandler: null,
+                _beforeUnloadHandler: null,
+                _gestureResumeAudio: null,
+                /** Shown when alert audio could not start (browser autoplay policy). Cleared after first successful play(). */
+                showAudioGestureHint: false
+            };
+        },
+        mounted() {
+            this.refresh();
+            this._pollInterval = setInterval(() => this.refresh(), 2000);
+            
+            this._visibilityHandler = () => {
+                if (document.hidden) {
+                    console.log('Page hidden event');
+                    this.stopAlertAudio();
+                } else {
+                    console.log('Page visible event, syncing audio');
+                    this.syncAlertAudioPlaylist(this.workstations);
+                }
+            };
+            document.addEventListener('visibilitychange', this._visibilityHandler);
+            
+            this._beforeUnloadHandler = () => {
+                console.log('Page unload/pagehide event');
+                this.stopAlertAudio();
+            };
+            window.addEventListener('beforeunload', this._beforeUnloadHandler);
+            window.addEventListener('pagehide', this._beforeUnloadHandler);
+            
+            /**
+             * Browsers block alert audio on first paint until a user gesture. Retrying sync after
+             * pointer/touch/key fixes cold dashboard loads; navigating from admin works because a gesture occurred.
+             */
+            this._gestureResumeAudio = (e) => {
+                if (document.hidden) return;
+                if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
+                this.syncAlertAudioPlaylist(this.workstations);
+            };
+            document.addEventListener('pointerdown', this._gestureResumeAudio, { capture: true, passive: true });
+            document.addEventListener('keydown', this._gestureResumeAudio, { capture: true });
+        },
+        beforeUnmount() {
+            console.log('Component unmounting');
+            this.stopAlertAudio();
+            if (this._pollInterval) {
+                clearInterval(this._pollInterval);
+                this._pollInterval = null;
+            }
+            if (this._visibilityHandler) {
+                document.removeEventListener('visibilitychange', this._visibilityHandler);
+                this._visibilityHandler = null;
+            }
+            if (this._beforeUnloadHandler) {
+                window.removeEventListener('beforeunload', this._beforeUnloadHandler);
+                window.removeEventListener('pagehide', this._beforeUnloadHandler);
+                this._beforeUnloadHandler = null;
+            }
+            if (this._gestureResumeAudio) {
+                document.removeEventListener('pointerdown', this._gestureResumeAudio, { capture: true });
+                document.removeEventListener('keydown', this._gestureResumeAudio, { capture: true });
+                this._gestureResumeAudio = null;
+            }
+        },
+        methods: {
+            slotForRow(ws, rowIdx) {
+                const slots = ws.slots || [];
+                if (slots.length !== 3) return null;
+                return slots[rowIdx] || null;
+            },
+            cellOn(ws, rowIdx) {
+                const s = this.slotForRow(ws, rowIdx);
+                return s ? !!s.active : false;
+            },
+            roleDisplayName(role) {
+                if (role == null || role === undefined) return '';
+                const r = String(role).toUpperCase();
+                if (r === 'ENGINEER') return 'Engineering';
+                if (r === 'LEADER') return 'Leader';
+                if (r === 'QUALITY') return 'Quality';
+                return String(role);
+            },
+            cellAriaLabel(ws, rowIdx) {
+                if (!ws) return '';
+                const s = this.slotForRow(ws, rowIdx);
+                if (!s) return '';
+                return (
+                    this.roleDisplayName(s.role) +
+                    ', input bit ' +
+                    s.inputBitIndex +
+                    ', output slave ' +
+                    s.outputSlaveId +
+                    ', relay ' +
+                    s.outputChannel
+                );
+            },
+            /**
+             * Rows 1–2: open upward. Col position: first column left-anchored, last column right-anchored
+             * so tooltips are not clipped horizontally at the scroll edges.
+             */
+            cellTooltipRootClass(rowIdx, colIdx) {
+                const n = this.workstations.length;
+                const lastCol = colIdx === n - 1;
+                const firstCol = n > 1 && colIdx === 0;
+
+                const base = [
+                    'pointer-events-none',
+                    'absolute',
+                    'z-[60]',
+                    'w-max',
+                    'min-w-[7.5rem]',
+                    'max-w-[10.5rem]',
+                    'rounded-md',
+                    'border',
+                    'border-gray-700/80',
+                    'bg-gray-950',
+                    'px-2',
+                    'py-1.5',
+                    'text-left',
+                    'shadow-md',
+                    'shadow-black/30',
+                    'opacity-0',
+                    'scale-[0.98]',
+                    'transition-all',
+                    'duration-300',
+                    'ease-out',
+                    'group-hover:opacity-100',
+                    'group-hover:scale-100'
+                ];
+                let hAlign;
+                if (lastCol) {
+                    hAlign = ['right-0', 'left-auto'];
+                } else if (firstCol) {
+                    hAlign = ['left-0', 'right-auto'];
+                } else {
+                    hAlign = ['left-1/2', '-translate-x-1/2'];
+                }
+                const merged = base.concat(hAlign);
+                if (rowIdx >= 1) {
+                    return merged.concat([
+                        'bottom-full',
+                        'mb-1.5',
+                        'translate-y-1.5',
+                        'group-hover:translate-y-0'
+                    ]);
+                }
+                return merged.concat(['top-full', 'mt-1.5', '-translate-y-1.5', 'group-hover:translate-y-0']);
+            },
+            cellClasses(ws, rowIdx) {
+                const on = ws ? this.cellOn(ws, rowIdx) : false;
+                const base = ['andon-matrix-cell__fill'];
+                if (!on) {
+                    return base.concat(['andon-matrix-cell--off']);
+                }
+                const rowTone =
+                    rowIdx === 0 ? 'andon-matrix-cell--e' : rowIdx === 1 ? 'andon-matrix-cell--l' : 'andon-matrix-cell--q';
+                return base.concat([rowTone]);
+            },
+            buildActiveAudioPlaylist(workstations) {
+                const out = [];
+                for (const ws of workstations) {
+                    for (const slot of ws.slots || []) {
+                        if (slot.active && slot.audioUrl) {
+                            console.log('Active slot with audio:', slot.slotId, 'url:', slot.audioUrl, 'bit:', slot.inputBitIndex);
+                            out.push({
+                                key: String(slot.slotId),
+                                url: slot.audioUrl,
+                                bit: slot.inputBitIndex
+                            });
+                        }
+                    }
+                }
+                out.sort((a, b) => a.bit - b.bit || String(a.key).localeCompare(String(b.key)));
+                console.log('Built audio playlist:', out.length, 'items:', out);
+                return out;
+            },
+            ensureAudioElement() {
+                if (!this._audioEl) {
+                    this._audioEl = new Audio();
+                    this._audioEl.preload = 'auto';
+                    this._audioEl.addEventListener('ended', () => this.onAlertAudioEnded());
+                    this._audioEl.addEventListener('error', (e) => {
+                        console.error('Audio playback error:', e, 'src:', this._audioEl?.src);
+                        if (this._audioEl?.error) {
+                            console.error('MediaError code:', this._audioEl.error.code, 'message:', this._audioEl.error.message);
+                        }
+                    });
+                    this._audioEl.addEventListener('loadstart', () => {
+                        console.log('Audio loading:', this._audioEl?.src);
+                    });
+                    this._audioEl.addEventListener('canplay', () => {
+                        console.log('Audio ready to play:', this._audioEl?.src);
+                    });
+                }
+                return this._audioEl;
+            },
+            resolvedAudioHref(url) {
+                try {
+                    return new URL(url, window.location.href).href;
+                } catch (e) {
+                    return url;
+                }
+            },
+            /** Canonical URL for comparison — must match how the browser exposes audio.src after assignment. */
+            normalizeAudioUrl(url) {
+                if (url == null || url === '') {
+                    return '';
+                }
+                try {
+                    return new URL(url, window.location.href).href;
+                } catch (e) {
+                    return String(url);
+                }
+            },
+            audioSrcMatches(audioEl, url) {
+                if (!audioEl) {
+                    return false;
+                }
+                try {
+                    const want = this.normalizeAudioUrl(url);
+                    if (!audioEl.src || audioEl.src === '') {
+                        return want === '';
+                    }
+                    return new URL(audioEl.src).href === want;
+                } catch (e) {
+                    return false;
+                }
+            },
+            /** Tracks HTMLMediaElement.play() promise — shows hint if browser blocks autoplay (NotAllowedError). */
+            notifyPlayAttempt(playPromise) {
+                if (!playPromise || typeof playPromise.then !== 'function') {
+                    return;
+                }
+                playPromise
+                    .then(() => {
+                        this.showAudioGestureHint = false;
+                    })
+                    .catch((err) => {
+                        const name = err && err.name;
+                        const msg = (err && err.message) || '';
+                        if (
+                            name === 'NotAllowedError' ||
+                            /not allowed|user gesture|interaction/i.test(msg)
+                        ) {
+                            this.showAudioGestureHint = true;
+                        }
+                    });
+            },
+            notifyPlayAttemptWithHandlers(playPromise, onSuccess, onFailure) {
+                if (!playPromise || typeof playPromise.then !== 'function') {
+                    return;
+                }
+                playPromise
+                    .then(() => {
+                        this.showAudioGestureHint = false;
+                        if (typeof onSuccess === 'function') onSuccess();
+                    })
+                    .catch((err) => {
+                        const name = err && err.name;
+                        const msg = (err && err.message) || '';
+                        if (
+                            name === 'NotAllowedError' ||
+                            /not allowed|user gesture|interaction/i.test(msg)
+                        ) {
+                            this.showAudioGestureHint = true;
+                        }
+                        if (typeof onFailure === 'function') onFailure(err);
+                    });
+            },
+            clearAlertGapTimer() {
+                if (this._alertGapTimer != null) {
+                    clearTimeout(this._alertGapTimer);
+                    this._alertGapTimer = null;
+                }
+            },
+            clearRepeatTimer() {
+                if (this._repeatTimer != null) {
+                    clearTimeout(this._repeatTimer);
+                    this._repeatTimer = null;
+                }
+            },
+            playlistSignature(pl) {
+                // Used to detect whether the "active audio set" has changed.
+                // This signature is for scheduling decisions only.
+                return (pl || [])
+                    .map((x) => `${String(x.key)}|${this.normalizeAudioUrl(x.url)}`)
+                    .join(';');
+            },
+            stopAlertAudio() {
+                console.log('Stopping audio playback');
+                this.showAudioGestureHint = false;
+                this.clearAlertGapTimer();
+                if (this._audioEl) {
+                    this._audioEl.pause();
+                    this._audioEl.currentTime = 0;
+                    this._audioEl.removeAttribute('src');
+                    this._audioEl.load();
+                    this._audioEl = null;
+                }
+                this.playingKey = null;
+                this.playlistIdx = 0;
+                this._currentPlaylist = [];
+                // Do not clear last-played timestamps; each audio has its own 15-minute timer.
+                this._playQueue = [];
+                this._queuedKeys = {};
+                this._activeAudioByKey = {};
+                // Clear any scheduled per-key replay timers.
+                for (const key of Object.keys(this._replayTimerByKey || {})) {
+                    clearTimeout(this._replayTimerByKey[key]);
+                    delete this._replayTimerByKey[key];
+                }
+                this._replayCountByKey = {};
+            },
+            playFromPlaylistIndex(i) {
+                const pl = this._currentPlaylist;
+                if (!pl || !pl[i]) {
+                    console.warn('playFromPlaylistIndex: invalid index or empty playlist', i, pl);
+                    return;
+                }
+                this.clearAlertGapTimer();
+                const a = this.ensureAudioElement();
+                const item = pl[i];
+                console.log('playFromPlaylistIndex:', i, 'of', pl.length, 'url:', item.url, 'key:', item.key);
+                // We do "play once", so never loop tracks.
+                a.loop = false;
+                this.playlistIdx = i;
+                this.playingKey = item.key;
+                const sameSrc = this.audioSrcMatches(a, item.url);
+                
+                if (!sameSrc) {
+                    console.log('Loading new audio source:', item.url);
+                    a.pause();
+                    a.currentTime = 0;
+                    a.src = item.url;
+                    a.load();
+                    this.notifyPlayAttempt(a.play());
+                } else if (a.paused || a.ended) {
+                    console.log('Resuming audio playback');
+                    this.notifyPlayAttempt(a.play());
+                }
+            },
+            playAlertItem(item) {
+                if (!item) return;
+                if (this.playingKey != null) return; // safety: no overlap
+
+                const a = this.ensureAudioElement();
+                // Always play once; no looping.
+                a.loop = false;
+                this.playingKey = item.key;
+
+                const sameSrc = this.audioSrcMatches(a, item.url);
+                if (!sameSrc) {
+                    console.log('Loading audio source:', item.url, 'key:', item.key);
+                    a.pause();
+                    a.currentTime = 0;
+                    a.src = item.url;
+                    a.load();
+                } else if (!a.paused && !a.ended) {
+                    // Already playing this src; avoid restarting.
+                    return;
+                }
+
+                this.notifyPlayAttemptWithHandlers(
+                    a.play(),
+                    () => {
+                        this._lastPlayedByKey[item.key] = Date.now();
+                    },
+                    () => {
+                        if (this.playingKey === item.key) this.playingKey = null;
+                    }
+                );
+            },
+            tryPlayNextFromQueue() {
+                // Never overlap: if currently playing, do nothing.
+                if (this.playingKey != null) return;
+                // If we're between tracks in the gap, wait.
+                if (this._alertGapTimer != null) return;
+
+                while (this._playQueue.length) {
+                    const item = this._playQueue.shift();
+                    if (!item) continue;
+                    delete this._queuedKeys[item.key];
+
+                    // Skip if no longer active right now.
+                    if (!this.isAudioKeyActiveNow(item.key)) continue;
+
+                    this.playAlertItem(item);
+                    return;
+                }
+            },
+            isAudioKeyActiveNow(audioKey) {
+                const key = String(audioKey);
+                for (const ws of this.workstations || []) {
+                    for (const slot of ws.slots || []) {
+                        if (!slot || !slot.active) continue;
+                        if (String(slot.slotId) !== key) continue;
+                        if (!slot.audioUrl) continue;
+                        return true;
+                    }
+                }
+                return false;
+            },
+            getActiveAudioItemByKey(audioKey) {
+                const key = String(audioKey);
+                for (const ws of this.workstations || []) {
+                    for (const slot of ws.slots || []) {
+                        if (!slot || !slot.active) continue;
+                        if (String(slot.slotId) !== key) continue;
+                        if (!slot.audioUrl) continue;
+                        return {
+                            key,
+                            url: slot.audioUrl,
+                            bit: slot.inputBitIndex
+                        };
+                    }
+                }
+                return null;
+            },
+            onAlertAudioEnded() {
+                const endedKey = this.playingKey;
+                console.log('Audio ended, playingKey:', endedKey);
+                this.playingKey = null;
+                this.playlistIdx = 0;
+
+                // Start the per-audio 15-minute replay timer AFTER playback ends.
+                const repeatMs = typeof this.repeatEveryMs === 'number' ? this.repeatEveryMs : 15 * 60 * 1000;
+                const maxRepeats = typeof this.maxAlertRepeats === 'number' ? this.maxAlertRepeats : 4;
+                if (endedKey != null) {
+                    if (this._replayTimerByKey[endedKey] != null) {
+                        clearTimeout(this._replayTimerByKey[endedKey]);
+                        delete this._replayTimerByKey[endedKey];
+                    }
+
+                    this._replayTimerByKey[endedKey] = setTimeout(() => {
+                        this._replayTimerByKey[endedKey] = null;
+
+                        // If tab is hidden, don't start new audio.
+                        if (document.hidden) return;
+
+                        // Replay only if the switch is still ON and we have an active audio URL.
+                        const item = this.getActiveAudioItemByKey(endedKey);
+                        if (!item) return;
+
+                        // Stop repeating this key after max repeats.
+                        const replayCount = Number(this._replayCountByKey[endedKey] || 0);
+                        if (replayCount >= maxRepeats) return;
+
+                        // Avoid overlap / duplicates.
+                        if (this.playingKey === item.key) return;
+                        if (this._queuedKeys[item.key]) return;
+
+                        this._playQueue.push(item);
+                        this._queuedKeys[item.key] = true;
+                        this._replayCountByKey[endedKey] = replayCount + 1;
+
+                        // Deterministic order (optional but stable).
+                        this._playQueue.sort((a, b) => a.bit - b.bit || String(a.key).localeCompare(String(b.key)));
+
+                        this.tryPlayNextFromQueue();
+                    }, repeatMs);
+                }
+
+                const gap = typeof this.alertGapMs === 'number' ? this.alertGapMs : 400;
+                this.clearAlertGapTimer();
+                this._alertGapTimer = setTimeout(() => {
+                    this._alertGapTimer = null;
+                    this.tryPlayNextFromQueue();
+                }, gap);
+            },
+            syncAlertAudioPlaylist(workstations) {
+                const pl = this.buildActiveAudioPlaylist(workstations);
+                if (pl.length === 0) {
+                    console.log('No active audio, stopping playback');
+                    this.stopAlertAudio();
+                    return;
+                }
+
+                // Detect per-key transitions so each OFF->ON reset plays immediately.
+                const prevActiveByKey = this._activeAudioByKey || {};
+                const activeByKey = {};
+                const activeNowSet = new Set();
+                for (const item of pl) {
+                    activeByKey[item.key] = item;
+                    activeNowSet.add(item.key);
+                }
+                this._activeAudioByKey = activeByKey;
+
+                // Purge queued items that are no longer active.
+                if (this._playQueue.length) {
+                    this._playQueue = this._playQueue.filter((it) => activeNowSet.has(it.key));
+                }
+                for (const key of Object.keys(this._queuedKeys)) {
+                    if (!activeNowSet.has(key)) delete this._queuedKeys[key];
+                }
+
+                // OFF transitions: cancel any scheduled replay timer for that key.
+                for (const key of Object.keys(prevActiveByKey)) {
+                    if (activeNowSet.has(key)) continue;
+                    if (this._replayTimerByKey[key] != null) {
+                        clearTimeout(this._replayTimerByKey[key]);
+                        delete this._replayTimerByKey[key];
+                    }
+                    delete this._replayCountByKey[key];
+                    delete this._queuedKeys[key];
+                }
+
+                // ON transitions: enqueue immediate playback for newly active keys.
+                for (const item of pl) {
+                    const wasActive = !!prevActiveByKey[item.key];
+                    if (wasActive) continue;
+
+                    // If a timer exists (e.g., due to timing races), clear it; new timer starts after this playback ends.
+                    if (this._replayTimerByKey[item.key] != null) {
+                        clearTimeout(this._replayTimerByKey[item.key]);
+                        delete this._replayTimerByKey[item.key];
+                    }
+                    this._replayCountByKey[item.key] = 0;
+
+                    if (item.key === this.playingKey) continue;
+                    if (this._queuedKeys[item.key]) continue;
+
+                    this._playQueue.push(item);
+                    this._queuedKeys[item.key] = true;
+                }
+
+                // Deterministic ordering: by bit then key.
+                if (this._playQueue.length) {
+                    this._playQueue.sort((a, b) => a.bit - b.bit || String(a.key).localeCompare(String(b.key)));
+                }
+
+                // Start next item if nothing is playing.
+                this.tryPlayNextFromQueue();
+            },
+            async refresh() {
+                try {
+                    const res = await fetch('/api/andon/dashboard');
+                    if (!res.ok) {
+                        console.warn('Dashboard refresh failed:', res.status);
+                        return;
+                    }
+                    const j = await res.json();
+                    const next = j.workstations || [];
+                    console.log('Dashboard refresh:', next.length, 'workstations');
+                    this.workstations = next;
+                    
+                    if (document.hidden) {
+                        console.log('Page hidden, stopping audio');
+                        this.stopAlertAudio();
+                    } else {
+                        this.syncAlertAudioPlaylist(next);
+                    }
+                    
+                    this.modbusConnected = !!j.modbusConnected;
+                    this.modbusError = j.modbusError || null;
+                } catch (e) {
+                    console.error('Dashboard refresh error:', e);
+                }
+            }
+        }
+    }).mount('#app');
+</script>
+</body>
+</html>

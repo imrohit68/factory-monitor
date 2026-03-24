@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>Event log export — Andon</title>
+    <link rel="stylesheet" th:href="@{/css/andon.css}"/>
+</head>
+<body>
+<div class="uc-shell">
+    <header class="uc-header uc-header--minimal">
+        <nav class="uc-nav">
+            <a class="btn-outline" th:href="@{/}">Dashboard</a>
+        </nav>
+    </header>
+
+    <main class="uc-page-enter">
+        <div class="report-panel">
+            <h2>Download event log (CSV)</h2>
+            <form method="get" th:action="@{/report/export.csv}">
+                <div class="report-dates">
+                    <label>Date from
+                        <input type="date" name="start" required th:value="${defaultStart}"/>
+                    </label>
+                    <span class="sub" style="align-self:flex-end;padding-bottom:8px;">to</span>
+                    <label>Date to
+                        <input type="date" name="end" required th:value="${defaultEnd}"/>
+                    </label>
+                </div>
+                <p class="report-warn" th:text="'Only for ' + ${maxRangeDays} + ' days max (inclusive).'">Range limit</p>
+                <div class="report-actions">
+                    <button class="btn-outline" type="submit">Download CSV</button>
+                </div>
+            </form>
+        </div>
+    </main>
+
+    <footer class="uc-footer">
+        <span>Event log export</span>
+        <span>Page 2</span>
+    </footer>
+</div>
+</body>
+</html>

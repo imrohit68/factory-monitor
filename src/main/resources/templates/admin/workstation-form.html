@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/admin-include :: head(${form.id != null} ? 'Edit Workstation' : 'New Workstation')}">
+    <title>Workstation</title>
+</head>
+<body class="bg-gray-50 text-gray-900 h-screen overflow-hidden flex flex-col antialiased font-sans text-base">
+
+<th:block th:replace="~{fragments/admin-include :: pageHeader}"/>
+
+<div class="flex-1 flex min-h-0 max-w-7xl w-full mx-auto px-6 py-4 md:py-6 gap-8">
+    <th:block th:replace="~{fragments/admin-include :: sidebar('workstations')}"/>
+
+    <main class="uc-page-enter flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
+        <div class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-1 space-y-6">
+        <div class="flex items-center gap-4 mb-2 shrink-0">
+            <a th:href="@{/admin/workstations}" class="uc-motion p-2 -ml-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg" title="Back to List">
+                <iconify-icon icon="solar:arrow-left-linear" class="text-2xl"></iconify-icon>
+            </a>
+            <div>
+                <h2 class="text-2xl font-medium tracking-tight text-gray-900" th:text="${form.id != null} ? 'Edit Workstation' : 'Create New Workstation'">Create New Workstation</h2>
+                <p class="text-base font-normal text-gray-500 mt-1">Configure hardware mappings and alert routing.</p>
+            </div>
+        </div>
+
+        <p th:if="${errorMessage}" class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" th:text="${errorMessage}">Error</p>
+
+        <form th:action="@{/admin/workstations}" method="post" th:object="${form}" enctype="multipart/form-data" class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+            <input type="hidden" th:field="*{id}" th:if="${form.id != null}"/>
+
+            <div class="p-6 sm:p-8 space-y-10">
+                <div>
+                    <h4 class="text-lg font-normal tracking-tight text-gray-900 mb-4 pb-2 border-b border-gray-100">General Details</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="space-y-2">
+                            <label for="ws-name" class="block text-base font-normal text-gray-700">Workstation Name</label>
+                            <input type="text" id="ws-name" th:field="*{name}" placeholder="e.g. Assembly Line 1"
+                                   class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900 focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 uc-motion"/>
+                        </div>
+                        <div class="space-y-2" th:if="${showPlacementControl}">
+                            <label for="ws-place-after" class="block text-base font-normal text-gray-700">Place After</label>
+                            <select id="ws-place-after" th:field="*{placeAfterWorkstationId}"
+                                    class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900 focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 uc-motion">
+                                <option th:value="${null}">At beginning</option>
+                                <option th:each="w : ${placementOptions}" th:value="${w.id}" th:text="${(w.name != null and !#strings.isEmpty(w.name)) ? w.name : 'Workstation #' + w.id}">Workstation</option>
+                            </select>
+                            <p class="text-xs text-gray-500">Choose which existing workstation this one should appear after.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h4 class="text-lg font-normal tracking-tight text-gray-900 mb-2 pb-2 border-b border-gray-100">Role Mappings</h4>
+                    <p class="text-sm text-gray-500 mb-6">Each input bit and each relay output may only be used once across all workstations. On this screen, Engineering, Leader, and Quality must each use a different input bit and a different Modbus relay.</p>
+
+                    <!-- Engineering -->
+                    <div class="border border-gray-200 rounded-xl overflow-hidden bg-gray-50/30 mb-6">
+                        <div class="px-5 py-3 border-b border-gray-200 flex items-center justify-between bg-white">
+                            <div class="flex items-center gap-3">
+                                <div class="w-7 h-7 rounded bg-amber-100 text-amber-700 flex items-center justify-center text-sm font-medium">E</div>
+                                <h5 class="text-base font-normal text-gray-900">Engineering</h5>
+                            </div>
+                        </div>
+                        <div class="p-5 space-y-6">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                                <div class="space-y-1.5">
+                                    <label class="block text-base font-normal text-gray-700">Input Bit</label>
+                                    <input type="number" th:field="*{engInputBit}" th:attr="max=${maxInputBit}" min="0"
+                                           class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 uc-motion"/>
+                                </div>
+                                <div class="space-y-1.5">
+                                    <label class="block text-base font-normal text-gray-700">Output Slave ID</label>
+                                    <input type="number" th:field="*{engSlave}" min="1" max="247"
+                                           class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 uc-motion"/>
+                                </div>
+                                <div class="space-y-1.5">
+                                    <label class="block text-base font-normal text-gray-700">Relay (1–32)</label>
+                                    <input type="number" th:field="*{engRelay}" min="1" max="32"
+                                           class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 uc-motion"/>
+                                </div>
+                            </div>
+                            <div class="bg-white border border-gray-200 rounded-lg p-4">
+                                <div class="flex items-center justify-between mb-3">
+                                    <label class="text-base font-normal text-gray-900 flex items-center gap-2">
+                                        <iconify-icon icon="solar:volume-loud-linear" class="text-xl text-gray-400"></iconify-icon>
+                                        Alert Audio
+                                    </label>
+                                    <label th:if="${form.id != null and form.currentEngAudioPath != null}" class="text-sm font-normal text-gray-500 hover:text-red-600 flex items-center gap-1.5 cursor-pointer">
+                                        <input type="checkbox" th:field="*{clearEngAudio}" class="rounded border-gray-300"/>
+                                        Clear
+                                    </label>
+                                </div>
+                                <p th:if="${form.id != null and form.currentEngAudioPath != null}" class="text-xs text-gray-500 mb-3" th:text="'Current: ' + ${form.currentEngAudioPath}"></p>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div class="space-y-2">
+                                        <label class="text-sm text-gray-600">Upload file (MP3, WAV, OGG)</label>
+                                        <input type="file" name="engAudioFile" accept="audio/*,.mp3,.wav,.ogg"
+                                               class="block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-medium"/>
+                                    </div>
+                                    <div class="space-y-2">
+                                        <label class="text-sm text-gray-600">Or URL</label>
+                                        <input type="text" th:field="*{engAudioUrlManual}" placeholder="https://…"
+                                               class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900 focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 uc-motion"/>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Leader -->
+                    <div class="border border-gray-200 rounded-xl overflow-hidden bg-gray-50/30 mb-6">
+                        <div class="px-5 py-3 border-b border-gray-200 flex items-center justify-between bg-white">
+                            <div class="flex items-center gap-3">
+                                <div class="w-7 h-7 rounded bg-emerald-100 text-emerald-700 flex items-center justify-center text-sm font-medium">L</div>
+                                <h5 class="text-base font-normal text-gray-900">Leader</h5>
+                            </div>
+                        </div>
+                        <div class="p-5 space-y-6">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                                <div class="space-y-1.5">
+                                    <label class="block text-base font-normal text-gray-700">Input Bit</label>
+                                    <input type="number" th:field="*{leadInputBit}" th:attr="max=${maxInputBit}" min="0"
+                                           class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 uc-motion"/>
+                                </div>
+                                <div class="space-y-1.5">
+                                    <label class="block text-base font-normal text-gray-700">Output Slave ID</label>
+                                    <input type="number" th:field="*{leadSlave}" min="1" max="247"
+                                           class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 uc-motion"/>
+                                </div>
+                                <div class="space-y-1.5">
+                                    <label class="block text-base font-normal text-gray-700">Relay (1–32)</label>
+                                    <input type="number" th:field="*{leadRelay}" min="1" max="32"
+                                           class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 uc-motion"/>
+                                </div>
+                            </div>
+                            <div class="bg-white border border-gray-200 rounded-lg p-4">
+                                <div class="flex items-center justify-between mb-3">
+                                    <label class="text-base font-normal text-gray-900 flex items-center gap-2">
+                                        <iconify-icon icon="solar:volume-loud-linear" class="text-xl text-gray-400"></iconify-icon>
+                                        Alert Audio
+                                    </label>
+                                    <label th:if="${form.id != null and form.currentLeadAudioPath != null}" class="text-sm font-normal text-gray-500 hover:text-red-600 flex items-center gap-1.5 cursor-pointer">
+                                        <input type="checkbox" th:field="*{clearLeadAudio}" class="rounded border-gray-300"/>
+                                        Clear
+                                    </label>
+                                </div>
+                                <p th:if="${form.id != null and form.currentLeadAudioPath != null}" class="text-xs text-gray-500 mb-3" th:text="'Current: ' + ${form.currentLeadAudioPath}"></p>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div class="space-y-2">
+                                        <label class="text-sm text-gray-600">Upload file</label>
+                                        <input type="file" name="leadAudioFile" accept="audio/*,.mp3,.wav,.ogg"
+                                               class="block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-medium"/>
+                                    </div>
+                                    <div class="space-y-2">
+                                        <label class="text-sm text-gray-600">Or URL</label>
+                                        <input type="text" th:field="*{leadAudioUrlManual}" placeholder="https://…"
+                                               class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900 focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 uc-motion"/>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quality -->
+                    <div class="border border-gray-200 rounded-xl overflow-hidden bg-gray-50/30">
+                        <div class="px-5 py-3 border-b border-gray-200 flex items-center justify-between bg-white">
+                            <div class="flex items-center gap-3">
+                                <div class="w-7 h-7 rounded bg-red-100 text-red-700 flex items-center justify-center text-sm font-medium">Q</div>
+                                <h5 class="text-base font-normal text-gray-900">Quality</h5>
+                            </div>
+                        </div>
+                        <div class="p-5 space-y-6">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                                <div class="space-y-1.5">
+                                    <label class="block text-base font-normal text-gray-700">Input Bit</label>
+                                    <input type="number" th:field="*{qcInputBit}" th:attr="max=${maxInputBit}" min="0"
+                                           class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900 focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500 uc-motion"/>
+                                </div>
+                                <div class="space-y-1.5">
+                                    <label class="block text-base font-normal text-gray-700">Output Slave ID</label>
+                                    <input type="number" th:field="*{qcSlave}" min="1" max="247"
+                                           class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900 focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500 uc-motion"/>
+                                </div>
+                                <div class="space-y-1.5">
+                                    <label class="block text-base font-normal text-gray-700">Relay (1–32)</label>
+                                    <input type="number" th:field="*{qcRelay}" min="1" max="32"
+                                           class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900 focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500 uc-motion"/>
+                                </div>
+                            </div>
+                            <div class="bg-white border border-gray-200 rounded-lg p-4">
+                                <div class="flex items-center justify-between mb-3">
+                                    <label class="text-base font-normal text-gray-900 flex items-center gap-2">
+                                        <iconify-icon icon="solar:volume-loud-linear" class="text-xl text-gray-400"></iconify-icon>
+                                        Alert Audio
+                                    </label>
+                                    <label th:if="${form.id != null and form.currentQcAudioPath != null}" class="text-sm font-normal text-gray-500 hover:text-red-600 flex items-center gap-1.5 cursor-pointer">
+                                        <input type="checkbox" th:field="*{clearQcAudio}" class="rounded border-gray-300"/>
+                                        Clear
+                                    </label>
+                                </div>
+                                <p th:if="${form.id != null and form.currentQcAudioPath != null}" class="text-xs text-gray-500 mb-3" th:text="'Current: ' + ${form.currentQcAudioPath}"></p>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div class="space-y-2">
+                                        <label class="text-sm text-gray-600">Upload file</label>
+                                        <input type="file" name="qcAudioFile" accept="audio/*,.mp3,.wav,.ogg"
+                                               class="block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-medium"/>
+                                    </div>
+                                    <div class="space-y-2">
+                                        <label class="text-sm text-gray-600">Or URL</label>
+                                        <input type="text" th:field="*{qcAudioUrlManual}" placeholder="https://…"
+                                               class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900 focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 uc-motion"/>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <p class="text-sm text-gray-500">Max input bit for your scan: <span th:text="${maxInputBit}">63</span> (<code class="text-xs bg-gray-100 px-1 rounded">andon.modbus.input-register-count</code>).</p>
+            </div>
+
+            <div class="px-6 py-4 bg-gray-50/50 border-t border-gray-200 flex items-center justify-end gap-3">
+                <a th:href="@{/admin/workstations}" class="uc-motion px-4 py-2 rounded-lg border border-gray-300 bg-white text-base font-normal text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 shadow-sm">Cancel</a>
+                <button type="submit" class="uc-motion inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-900 text-base font-normal text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 shadow-sm">
+                    <iconify-icon icon="solar:check-circle-linear" class="text-xl"></iconify-icon>
+                    Save Configuration
+                </button>
+            </div>
+        </form>
+        </div>
+    </main>
+</div>
+</body>
+</html>
