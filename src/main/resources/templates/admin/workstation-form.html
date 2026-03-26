@@ -73,8 +73,8 @@
                                            class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 uc-motion"/>
                                 </div>
                                 <div class="space-y-1.5">
-                                    <label class="block text-base font-normal text-gray-700">Relay (1–32)</label>
-                                    <input type="number" th:field="*{engRelay}" min="1" max="32"
+                                    <label class="block text-base font-normal text-gray-700">Relay (1–<span th:text="${maxRelayPerSlave}">32</span>)</label>
+                                    <input type="number" th:field="*{engRelay}" min="1" th:attr="max=${maxRelayPerSlave}"
                                            class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 uc-motion"/>
                                 </div>
                             </div>
@@ -127,8 +127,8 @@
                                            class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 uc-motion"/>
                                 </div>
                                 <div class="space-y-1.5">
-                                    <label class="block text-base font-normal text-gray-700">Relay (1–32)</label>
-                                    <input type="number" th:field="*{leadRelay}" min="1" max="32"
+                                    <label class="block text-base font-normal text-gray-700">Relay (1–<span th:text="${maxRelayPerSlave}">32</span>)</label>
+                                    <input type="number" th:field="*{leadRelay}" min="1" th:attr="max=${maxRelayPerSlave}"
                                            class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 uc-motion"/>
                                 </div>
                             </div>
@@ -181,8 +181,8 @@
                                            class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900 focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500 uc-motion"/>
                                 </div>
                                 <div class="space-y-1.5">
-                                    <label class="block text-base font-normal text-gray-700">Relay (1–32)</label>
-                                    <input type="number" th:field="*{qcRelay}" min="1" max="32"
+                                    <label class="block text-base font-normal text-gray-700">Relay (1–<span th:text="${maxRelayPerSlave}">32</span>)</label>
+                                    <input type="number" th:field="*{qcRelay}" min="1" th:attr="max=${maxRelayPerSlave}"
                                            class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base text-gray-900 focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500 uc-motion"/>
                                 </div>
                             </div>
@@ -215,7 +215,7 @@
                     </div>
                 </div>
 
-                <p class="text-sm text-gray-500">Max input bit for your scan: <span th:text="${maxInputBit}">63</span> (<code class="text-xs bg-gray-100 px-1 rounded">andon.modbus.input-register-count</code>).</p>
+                <p class="text-sm text-gray-500">Max input bit for your scan: <span th:text="${maxInputBit}">63</span> (<code class="text-xs bg-gray-100 px-1 rounded">system.modbus.input-register-count</code>).</p>
             </div>
 
             <div class="px-6 py-4 bg-gray-50/50 border-t border-gray-200 flex items-center justify-end gap-3">

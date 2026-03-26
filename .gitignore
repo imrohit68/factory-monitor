@@ -1,5 +1,7 @@
 HELP.md
 target/
+# Windows installer build (jpackage staging; not part of what you ship)
+installer/stage/
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
@@ -31,3 +33,6 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# Legacy embedded DB under repo (runtime uses system.data-dir / factory-monitor.sqlite)
+data/

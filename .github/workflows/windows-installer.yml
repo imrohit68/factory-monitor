@@ -1,0 +1,43 @@
+# Build the self-contained factory-monitor-installer.exe on Windows (required by jpackage).
+# Run from your Mac: push this repo to GitHub → Actions → "Windows installer" → Run workflow
+# → download the artifact (single .exe).
+
+name: Windows installer
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Install NSIS
+        run: choco install nsis -y
+
+      - name: Add NSIS to PATH
+        shell: pwsh
+        run: |
+          foreach ($p in @("${env:ProgramFiles}\NSIS", "${env:ProgramFiles(x86)}\NSIS")) {
+            if (Test-Path -LiteralPath $p) { Add-Content $env:GITHUB_PATH $p }
+          }
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          Set-Location $env:GITHUB_WORKSPACE
+          .\installer\build-windows.ps1 -CleanStage
+
+      - name: Upload installer (single file to share)
+        uses: actions/upload-artifact@v4
+        with:
+          name: factory-monitor-installer
+          path: target/factory-monitor-installer.exe
