@@ -2,8 +2,6 @@ HELP.md
 target/
 # Windows installer build (jpackage staging; not part of what you ship)
 installer/stage/
-# Copied from windows\app-icon.ico during NSIS build (do not commit)
-installer/nsis/app-icon.ico
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
@@ -38,6 +36,3 @@ build/
 
 # Legacy embedded DB under repo (runtime uses system.data-dir / factory-monitor.sqlite)
 data/
-
-# Local venv used to regenerate installer/windows/app-icon.ico from app-logo.svg
-.venv-icon/

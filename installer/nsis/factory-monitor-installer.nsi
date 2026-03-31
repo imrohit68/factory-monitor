@@ -29,9 +29,8 @@ ${StrRep}
 
 !define PRODUCT_VERSION "0.0.1"
 !define MUI_ABORTWARNING
-; App icon (same as web logo), copied to nsis\ by build-windows.ps1 before compile
-!define MUI_ICON "nsis\app-icon.ico"
-!define MUI_UNICON "nsis\app-icon.ico"
+!define MUI_ICON "${NSISDIR}\Contrib\Graphics\Icons\modern-install.ico"
+!define MUI_UNICON "${NSISDIR}\Contrib\Graphics\Icons\modern-uninstall.ico"
 
 !define MUI_WELCOMEPAGE_TITLE "Welcome to Factory Monitor Setup"
 !define MUI_WELCOMEPAGE_TEXT "This wizard installs Factory Monitor: workstation dashboard, Modbus, and event log.$\r$\n$\r$\nYour data folder is always:$\r$\n%USERPROFILE%\factory-monitor-data$\r$\n$\r$\nIf that folder already has a database, you can keep it or start over.$\r$\n$\r$\nClick Next to continue."

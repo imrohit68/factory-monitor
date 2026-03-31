@@ -17,11 +17,6 @@
     .\installer\build-windows.ps1 -CleanStage   # remove installer\stage after success
 
   Output to distribute:  target\factory-monitor-installer.exe
-
-  App icon: installer\windows\app-icon.ico (jpackage exe, NSIS wizard). Copy the same file to
-  src\main\resources\static\favicon.ico when you change the logo.
-  Regenerate from SVG (from repo root): Python venv with cairosvg + Pillow, or ImageMagick from installer\windows:
-    magick -background none ..\..\src\main\resources\static\images\app-logo.svg -define icon:auto-resize=256,128,64,48,32,16 app-icon.ico
 #>
 param(
     [switch] $CleanStage
@@ -62,24 +57,15 @@ if (Test-Path -LiteralPath $AppImageDir) {
 New-Item -ItemType Directory -Path $StageDir -Force | Out-Null
 
 # Do not add --win-console here — the desktop launcher should not show a console window.
-$IconPath = Join-Path $PSScriptRoot "windows\app-icon.ico"
-$jpackageArgs = @(
-    "--type", "app-image",
-    "--name", "FactoryMonitor",
-    "--input", (Join-Path $RepoRoot "target"),
-    "--main-jar", $JarName,
-    "--main-class", "org.springframework.boot.loader.launch.JarLauncher",
-    "--dest", $StageDir,
-    "--java-options", "-Dfile.encoding=UTF-8",
-    "--app-version", "0.0.1"
-)
-if (Test-Path -LiteralPath $IconPath) {
-    $jpackageArgs += @("--icon", $IconPath)
-} else {
-    Write-Warning "No app icon at $IconPath - exe uses default Java icon. Regenerate from app-logo.svg if needed."
-}
-
-& jpackage @jpackageArgs
+& jpackage `
+    --type app-image `
+    --name FactoryMonitor `
+    --input (Join-Path $RepoRoot "target") `
+    --main-jar $JarName `
+    --main-class org.springframework.boot.loader.launch.JarLauncher `
+    --dest $StageDir `
+    --java-options "-Dfile.encoding=UTF-8" `
+    --app-version "0.0.1"
 
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
@@ -93,14 +79,6 @@ Set-Location $PSScriptRoot
 $makensis = Get-Command makensis -ErrorAction SilentlyContinue
 if (-not $makensis) {
     Write-Error "makensis not found. Install NSIS 3+ and add it to PATH."
-}
-
-$IconSrc = Join-Path $PSScriptRoot "windows\app-icon.ico"
-$IconNsis = Join-Path $PSScriptRoot "nsis\app-icon.ico"
-if (Test-Path -LiteralPath $IconSrc) {
-    Copy-Item -LiteralPath $IconSrc -Destination $IconNsis -Force
-} else {
-    Write-Warning "Missing $IconSrc - NSIS will fail if app-icon.ico is not in nsis folder. Generate from src\main\resources\static\images\app-logo.svg (see comment in this script)."
 }
 
 & makensis "/DAPP_SOURCE_DIR=$AppImageDir" (Join-Path $PSScriptRoot "nsis\factory-monitor-installer.nsi")
