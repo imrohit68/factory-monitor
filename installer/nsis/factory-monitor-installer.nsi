@@ -67,6 +67,7 @@ Var ModbusBaud
 Var ModbusStopBits
 Var ModbusPollMs
 Var PortManual
+Var HEditPort
 Var HEditDataDir
 Var HEditUser
 Var HEditPass
@@ -78,6 +79,10 @@ Var HEditStop
 Var HEditPoll
 Var HLabelRecovery
 Var LogFile
+Var HBrowseDataDir
+Var DeleteRecoveryOnInstall
+Var UseExistingDataLock
+Var RecoveryPromptDone
 
 Function finishOpenDataDir
   ExecShell "open" "explorer.exe" "$DataDir"
@@ -97,6 +102,9 @@ Function .onInit
   StrCpy $ModbusPollMs "5000"
 
   StrCpy $PortManual "COM1"
+  StrCpy $DeleteRecoveryOnInstall "0"
+  StrCpy $UseExistingDataLock "0"
+  StrCpy $RecoveryPromptDone "0"
 
   ${If} ${Silent}
     Call SilentDefaults
@@ -118,6 +126,8 @@ Function SilentDefaults
   ${If} $RecoveryPath != ""
     StrCpy $DataDir $RecoveryPath
     StrCpy $RecoverMode "1"
+    StrCpy $UseExistingDataLock "1"
+    StrCpy $DeleteRecoveryOnInstall "0"
   ${EndIf}
 FunctionEnd
 
@@ -153,7 +163,6 @@ FunctionEnd
 
 Function ScanRecoverySilent
   StrCpy $RecoveryPath ""
-  StrCpy $RecoverMode "0"
   GetTempFileName $9
   StrCpy $8 "$9-recover.ps1"
   FileOpen $7 "$8" w
@@ -169,7 +178,6 @@ Function ScanRecoverySilent
     Call TakeFirstLine
     Pop $1
     StrCpy $RecoveryPath $1
-    StrCpy $RecoverMode "1"
   ${EndIf}
 FunctionEnd
 
@@ -180,6 +188,31 @@ FunctionEnd
 Function PageConfig
   Call ScanRecoveryPaths
 
+  ${IfNot} ${Silent}
+    ${If} $RecoveryPath != ""
+    ${AndIf} $RecoveryPromptDone != "1"
+      StrCpy $RecoveryPromptDone "1"
+      MessageBox MB_YESNO|MB_ICONQUESTION "An existing Factory Monitor data folder was found:$\r$\n$RecoveryPath$\r$\n$\r$\nYes — Keep and use this database (same folder; you will not pick a different location here).$\r$\n$\r$\nNo — Delete that folder during setup and create a new empty database (you can choose the path below)." IDYES existing_keep
+      StrCpy $DeleteRecoveryOnInstall "1"
+      StrCpy $RecoverMode "0"
+      StrCpy $UseExistingDataLock "0"
+      StrCpy $DataDir "$PROFILE\factory-monitor-data"
+      MessageBox MB_OK|MB_ICONEXCLAMATION "The folder below will be permanently deleted when files are installed:$\r$\n$RecoveryPath$\r$\n$\r$\nA new database will be created at the data directory you set on this page."
+      Goto existing_done
+      existing_keep:
+        StrCpy $DataDir $RecoveryPath
+        StrCpy $RecoverMode "1"
+        StrCpy $DeleteRecoveryOnInstall "0"
+        StrCpy $UseExistingDataLock "1"
+      existing_done:
+    ${EndIf}
+    ${If} $RecoveryPath == ""
+      StrCpy $DeleteRecoveryOnInstall "0"
+      StrCpy $UseExistingDataLock "0"
+      StrCpy $RecoverMode "0"
+    ${EndIf}
+  ${EndIf}
+
   nsDialogs::Create 1018
   Pop $0
 
@@ -189,26 +222,28 @@ Function PageConfig
   ${NSD_CreateText} 38% 34u 52% 12u "$DataDir"
   Pop $HEditDataDir
   ${NSD_CreateBrowseButton} 92% 33u 8% 14u "..."
-  Pop $R9
-  ${NSD_OnClick} $R9 BrowseDataDir
+  Pop $HBrowseDataDir
+  ${NSD_OnClick} $HBrowseDataDir BrowseDataDir
 
-  ${NSD_CreateLabel} 0 52u 100% 24u ""
+  ${NSD_CreateLabel} 0 52u 100% 40u ""
   Pop $HLabelRecovery
-  ${If} $RecoveryPath != ""
-    ${NSD_SetText} $HLabelRecovery "Existing data folder detected: $RecoveryPath$\r$\nUse $\"Recover$\" below or edit the path for a fresh database."
+  ${If} $UseExistingDataLock == "1"
+    ${NSD_SetText} $HLabelRecovery "Using your existing database at:$\r$\n$RecoveryPath$\r$\n(Data location is fixed for this install.)"
   ${Else}
-    ${NSD_SetText} $HLabelRecovery "No existing factory-monitor-data folder was found on any drive (fresh install)."
+    ${If} $RecoveryPath != ""
+    ${AndIf} $DeleteRecoveryOnInstall == "1"
+      ${NSD_SetText} $HLabelRecovery "The previously detected folder will be removed during install:$\r$\n$RecoveryPath$\r$\nSet the new data directory below."
+    ${Else}
+      ${NSD_SetText} $HLabelRecovery "No existing factory-monitor-data folder was found on any drive (fresh install)."
+    ${EndIf}
   ${EndIf}
 
-  ${NSD_CreateButton} 0 82u 48% 14u "Recover detected data"
-  Pop $R9
-  ${NSD_OnClick} $R9 OnRecoverClick
+  ${If} $UseExistingDataLock == "1"
+    System::Call 'user32::EnableWindow(p $HEditDataDir, i 0)'
+    System::Call 'user32::EnableWindow(p $HBrowseDataDir, i 0)'
+  ${EndIf}
 
-  ${NSD_CreateButton} 52% 82u 48% 14u "Fresh setup"
-  Pop $R9
-  ${NSD_OnClick} $R9 OnFreshClick
-
-  ${NSD_CreateHLine} 0 102u 100% 1u ""
+  ${NSD_CreateHLine} 0 98u 100% 1u ""
 
   ${NSD_CreateLabel} 0 110u 48% 10u "Initial admin username"
   ${NSD_CreateText} 52% 108u 48% 12u "$InitialUser"
@@ -251,32 +286,21 @@ Function BrowseDataDir
   ${EndIf}
 FunctionEnd
 
-Function OnRecoverClick
-  ${If} $RecoveryPath != ""
-    StrCpy $DataDir $RecoveryPath
-    StrCpy $RecoverMode "1"
-    ${NSD_SetText} $HEditDataDir $DataDir
-    MessageBox MB_OK "Data directory set to:$\r$\n$DataDir$\r$\n$\r$\nExisting database will be used. Initial username/password apply only when no users exist yet."
-  ${Else}
-    MessageBox MB_ICONEXCLAMATION "No existing factory-monitor-data folder was found."
-  ${EndIf}
-FunctionEnd
-
-Function OnFreshClick
-  StrCpy $RecoverMode "0"
-  MessageBox MB_OK "Fresh setup: use a new or empty data folder. Folders are created on first run."
-FunctionEnd
-
 Function PageConfigLeave
-  ${NSD_GetText} $HEditDataDir $DataDir
-  ${NSD_GetText} $HEditUser $InitialUser
-  ${NSD_GetText} $HEditPass $InitialPass
-  ${NSD_GetText} $HEditRepeat $AlertRepeatMin
-  ${NSD_GetText} $HEditMaxRep $AlertMaxRepeats
-  ${NSD_GetText} $HEditSlave $ModbusSlaveId
-  ${NSD_GetText} $HEditBaud $ModbusBaud
-  ${NSD_GetText} $HEditStop $ModbusStopBits
-  ${NSD_GetText} $HEditPoll $ModbusPollMs
+  ${IfNot} ${Silent}
+    ${NSD_GetText} $HEditDataDir $DataDir
+    ${NSD_GetText} $HEditUser $InitialUser
+    ${NSD_GetText} $HEditPass $InitialPass
+    ${NSD_GetText} $HEditRepeat $AlertRepeatMin
+    ${NSD_GetText} $HEditMaxRep $AlertMaxRepeats
+    ${NSD_GetText} $HEditSlave $ModbusSlaveId
+    ${NSD_GetText} $HEditBaud $ModbusBaud
+    ${NSD_GetText} $HEditStop $ModbusStopBits
+    ${NSD_GetText} $HEditPoll $ModbusPollMs
+  ${EndIf}
+  ${If} $UseExistingDataLock == "1"
+    StrCpy $DataDir $RecoveryPath
+  ${EndIf}
 
   ${If} $DataDir == ""
     MessageBox MB_ICONEXCLAMATION "Data directory cannot be empty."
@@ -382,8 +406,8 @@ Function PagePorts
 
   ${NSD_CreateLabel} 0 0 100% 32u "Modbus serial port (system.modbus.port-name). Click Detect to list ports from Windows, or type e.g. COM1, COM3."
   ${NSD_CreateLabel} 0 40u 100% 10u "Port name"
-  ${NSD_CreateText} 0 52u 100% 12u "COM1"
-  Pop $PortManual
+  ${NSD_CreateText} 0 52u 100% 12u "$PortManual"
+  Pop $HEditPort
   ${NSD_CreateButton} 0 72u 100% 14u "Detect serial ports"
   Pop $R9
   ${NSD_OnClick} $R9 OnDetectPorts
@@ -396,14 +420,14 @@ Function OnDetectPorts
   Pop $0
   Pop $1
   ${If} $1 != ""
-    ${NSD_SetText} $PortManual $1
+    ${NSD_SetText} $HEditPort $1
   ${Else}
     MessageBox MB_OK "No serial ports reported by Windows. Enter the port manually (e.g. COM1)."
   ${EndIf}
 FunctionEnd
 
 Function PagePortsLeave
-  ${NSD_GetText} $PortManual $0
+  ${NSD_GetText} $HEditPort $0
   StrCpy $PortManual $0
   ${If} $PortManual == ""
     MessageBox MB_ICONEXCLAMATION "Enter a serial port name (e.g. COM3)."
@@ -435,6 +459,7 @@ Function WriteInstallLog
   FileWrite $LogFile "INSTDIR=$INSTDIR$\r$\n"
   FileWrite $LogFile "DataDir=$DataDir$\r$\n"
   FileWrite $LogFile "RecoverMode=$RecoverMode$\r$\n"
+  FileWrite $LogFile "DeleteRecoveryOnInstall=$DeleteRecoveryOnInstall$\r$\n"
   FileWrite $LogFile "Port=$PortManual$\r$\n"
   FileClose $LogFile
 FunctionEnd
@@ -444,6 +469,11 @@ Section "Application" SecApp
   FileOpen $LogFile "$INSTDIR\install.log" w
   FileWrite $LogFile "Factory Monitor installer log$\r$\n"
   FileClose $LogFile
+
+  ${If} $DeleteRecoveryOnInstall == "1"
+  ${AndIf} $RecoveryPath != ""
+    RMDir /r "$RecoveryPath"
+  ${EndIf}
 
   File /r "${APP_SOURCE_DIR}\*.*"
 
