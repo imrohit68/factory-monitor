@@ -39,7 +39,7 @@
                     <img th:src="@{/images/app-logo.svg}" alt="App Logo" class="w-[4.5rem] h-[4.5rem] sm:w-20 sm:h-20 shrink-0" aria-hidden="true"/>
                 </div>
                 <h2 class="text-xl sm:text-2xl font-normal tracking-tight text-gray-900">Sign in</h2>
-                <p class="text-sm text-gray-500 mt-2">Use your credentials to open the admin panel.</p>
+                <p class="text-sm text-gray-500 mt-2">Use your admin username and password. After sign-in you can open workstations, event log, or configure the serial device.</p>
                 <p th:if="${param.error}" class="text-sm text-red-600 mt-3">Invalid username or password.</p>
             </div>
             <form th:action="@{/login}" method="post" class="space-y-5">

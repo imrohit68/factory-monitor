@@ -55,7 +55,7 @@
                     {
                         rowIdx: 2,
                         smallLabel: 'QUALITY',
-                        smallLabelLine2: 'CONTROL',
+                        smallLabelLine2: 'CONTROLLER',
                         badgeLetter: 'Q',
                         labelStack: true
                     }
@@ -153,7 +153,7 @@
                 const r = String(role).toUpperCase();
                 if (r === 'ENGINEER') return 'Engineering';
                 if (r === 'LEADER') return 'Leader';
-                if (r === 'QUALITY') return 'Quality';
+                if (r === 'QUALITY') return 'Quality Controller';
                 return String(role);
             },
             cellAriaLabel(ws, rowIdx) {

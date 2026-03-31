@@ -102,7 +102,7 @@ body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
     min-height: 2.75rem;
 }
 .matrix__label-text {
-    /* Engineering row labels: ENGINEERS / LEADER / QUALITY / CONTROL */
+    /* Engineering row labels: ENGINEERS / LEADER / QUALITY / CONTROLLER */
     font-size: clamp(0.55rem, 1.05vw, 0.80rem);
     font-weight: 700;
     text-transform: uppercase;

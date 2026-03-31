@@ -1,12 +1,9 @@
 ; Factory Monitor — Windows installer (NSIS 3+, Unicode)
 ;
-; The OUTPUT .exe is self-contained: at compile time, all files under APP_SOURCE_DIR
-; (jpackage app-image: launcher, JAR, embedded JRE) are compressed into this installer.
-; People you share the .exe with do NOT need any other files — only this binary.
-;
-; Build (developer machine):  installer\build-windows.ps1
-; Manual NSIS:  cd installer && makensis /DAPP_SOURCE_DIR=stage\FactoryMonitor nsis\factory-monitor-installer.nsi
-; (stage\FactoryMonitor is produced by jpackage; only needed while building, not for distribution.)
+; Data is always stored under:  %USERPROFILE%\factory-monitor-data
+; If factory-monitor.sqlite exists there, the user is asked to recover or wipe.
+; Recover: existing DB and logins are kept — initial username/password are not written to config.
+; Wipe: that folder is removed during install, then normal flow (new admin credentials on the config page).
 
 !ifndef APP_SOURCE_DIR
   !define APP_SOURCE_DIR "stage\FactoryMonitor"
@@ -24,6 +21,8 @@ InstallDirRegKey HKLM "Software\FactoryMonitor" "InstallDir"
 !include "nsDialogs.nsh"
 !include "LogicLib.nsh"
 !include "FileFunc.nsh"
+!include "StrFunc.nsh"
+${StrRep}
 
 !insertmacro GetParameters
 !insertmacro GetOptions
@@ -34,7 +33,7 @@ InstallDirRegKey HKLM "Software\FactoryMonitor" "InstallDir"
 !define MUI_UNICON "${NSISDIR}\Contrib\Graphics\Icons\modern-uninstall.ico"
 
 !define MUI_WELCOMEPAGE_TITLE "Welcome to the Factory Monitor Setup Wizard"
-!define MUI_WELCOMEPAGE_TEXT "This will install Factory Monitor (workstation dashboard, Modbus, event log).$\r$\n$\r$\nYou can accept defaults and click through, or adjust data location, security, and serial settings before files are copied.$\r$\n$\r$\nClick Next to continue."
+!define MUI_WELCOMEPAGE_TEXT "This will install Factory Monitor (workstation dashboard, Modbus, event log).$\r$\n$\r$\nApplication data is always stored in:$\r$\n%USERPROFILE%\factory-monitor-data$\r$\n$\r$\nIf a previous database is found there, you can recover it or start fresh.$\r$\n$\r$\nClick Next to continue."
 
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_DIRECTORY
@@ -57,7 +56,6 @@ Page custom PagePorts PagePortsLeave
 
 Var DataDir
 Var RecoverMode
-Var RecoveryPath
 Var InitialUser
 Var InitialPass
 Var AlertRepeatMin
@@ -68,7 +66,6 @@ Var ModbusStopBits
 Var ModbusPollMs
 Var PortManual
 Var HEditPort
-Var HEditDataDir
 Var HEditUser
 Var HEditPass
 Var HEditRepeat
@@ -78,8 +75,9 @@ Var HEditBaud
 Var HEditStop
 Var HEditPoll
 Var HLabelRecovery
+Var HLabelUser
+Var HLabelPass
 Var LogFile
-Var HBrowseDataDir
 Var DeleteRecoveryOnInstall
 Var UseExistingDataLock
 Var RecoveryPromptDone
@@ -91,7 +89,6 @@ FunctionEnd
 Function .onInit
   StrCpy $DataDir "$PROFILE\factory-monitor-data"
   StrCpy $RecoverMode "0"
-  StrCpy $RecoveryPath ""
   StrCpy $InitialUser "admin"
   StrCpy $InitialPass "admin@123"
   StrCpy $AlertRepeatMin "15"
@@ -100,14 +97,13 @@ Function .onInit
   StrCpy $ModbusBaud "9600"
   StrCpy $ModbusStopBits "1"
   StrCpy $ModbusPollMs "5000"
-
   StrCpy $PortManual "COM1"
   StrCpy $DeleteRecoveryOnInstall "0"
   StrCpy $UseExistingDataLock "0"
   StrCpy $RecoveryPromptDone "0"
 
   ${If} ${Silent}
-    Call SilentDefaults
+    Call SilentFixedPathDefaults
   ${EndIf}
 
   ${GetParameters} $0
@@ -121,176 +117,107 @@ Function .onInit
   ${EndIf}
 FunctionEnd
 
-Function SilentDefaults
-  Call ScanRecoverySilent
-  ${If} $RecoveryPath != ""
-    StrCpy $DataDir $RecoveryPath
-    StrCpy $RecoverMode "1"
+; Silent: if SQLite exists at fixed path, recover (no credential lines in config). Else fresh defaults.
+Function SilentFixedPathDefaults
+  IfFileExists "$PROFILE\factory-monitor-data\factory-monitor.sqlite" 0 silent_fresh
     StrCpy $UseExistingDataLock "1"
     StrCpy $DeleteRecoveryOnInstall "0"
-  ${EndIf}
-FunctionEnd
-
-Function TakeFirstLine
-  Exch $0
-  Push $1
-  Push $2
-  Push $3
-  StrLen $3 $0
-  StrCpy $1 0
-  ${Do}
-    ${If} $1 >= $3
-      StrCpy $2 $0
-      ${ExitDo}
-    ${EndIf}
-    StrCpy $R3 $0 1 $1
-    ${If} $R3 == "$\r"
-      StrCpy $2 $0 $1
-      ${ExitDo}
-    ${EndIf}
-    ${If} $R3 == "$\n"
-      StrCpy $2 $0 $1
-      ${ExitDo}
-    ${EndIf}
-    IntOp $1 $1 + 1
-  ${Loop}
-  StrCpy $0 $2
-  Pop $3
-  Pop $2
-  Pop $1
-  Exch $0
-FunctionEnd
-
-Function ScanRecoverySilent
-  StrCpy $RecoveryPath ""
-  GetTempFileName $9
-  StrCpy $8 "$9-recover.ps1"
-  FileOpen $7 "$8" w
-  FileWrite $7 "$$drives = Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue$\r$\n"
-  FileWrite $7 "foreach ($$d in $$drives) {$$p = Join-Path $$d.Root 'factory-monitor-data'; if (Test-Path -LiteralPath $$p) { Write-Output $$p }}$\r$\n"
-  FileClose $7
-  nsExec::ExecToStack 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$8"'
-  Pop $0
-  Pop $1
-  Delete "$8"
-  ${If} $1 != ""
-    Push $1
-    Call TakeFirstLine
-    Pop $1
-    StrCpy $RecoveryPath $1
-  ${EndIf}
-FunctionEnd
-
-Function ScanRecoveryPaths
-  Call ScanRecoverySilent
+    StrCpy $RecoverMode "1"
+    Return
+  silent_fresh:
+    StrCpy $UseExistingDataLock "0"
+    StrCpy $DeleteRecoveryOnInstall "0"
+    StrCpy $RecoverMode "0"
 FunctionEnd
 
 Function PageConfig
-  Call ScanRecoveryPaths
+  StrCpy $DataDir "$PROFILE\factory-monitor-data"
 
   ${IfNot} ${Silent}
-    ${If} $RecoveryPath != ""
-    ${AndIf} $RecoveryPromptDone != "1"
+    ${If} $RecoveryPromptDone != "1"
       StrCpy $RecoveryPromptDone "1"
-      MessageBox MB_YESNO|MB_ICONQUESTION "An existing Factory Monitor data folder was found:$\r$\n$RecoveryPath$\r$\n$\r$\nYes — Keep and use this database (same folder; you will not pick a different location here).$\r$\n$\r$\nNo — Delete that folder during setup and create a new empty database (you can choose the path below)." IDYES existing_keep
-      StrCpy $DeleteRecoveryOnInstall "1"
-      StrCpy $RecoverMode "0"
-      StrCpy $UseExistingDataLock "0"
-      StrCpy $DataDir "$PROFILE\factory-monitor-data"
-      MessageBox MB_OK|MB_ICONEXCLAMATION "The folder below will be permanently deleted when files are installed:$\r$\n$RecoveryPath$\r$\n$\r$\nA new database will be created at the data directory you set on this page."
-      Goto existing_done
-      existing_keep:
-        StrCpy $DataDir $RecoveryPath
-        StrCpy $RecoverMode "1"
-        StrCpy $DeleteRecoveryOnInstall "0"
+      IfFileExists "$DataDir\factory-monitor.sqlite" 0 prompt_done
+        MessageBox MB_YESNO|MB_ICONQUESTION "Existing Factory Monitor data was found at:$\r$\n$DataDir$\r$\n$\r$\nYes — Recover: keep your database and existing logins (you will not be asked for a new admin password).$\r$\n$\r$\nNo — Start fresh: delete that folder and create a new empty database (you will set a new admin user and password next)." IDYES recover_yes
+        StrCpy $UseExistingDataLock "0"
+        StrCpy $DeleteRecoveryOnInstall "1"
+        StrCpy $RecoverMode "0"
+        MessageBox MB_OK|MB_ICONEXCLAMATION "The folder will be permanently removed during install:$\r$\n$DataDir$\r$\n$\r$\nAfter installation, set a new admin username and password on this page."
+        Goto prompt_done
+        recover_yes:
         StrCpy $UseExistingDataLock "1"
-      existing_done:
-    ${EndIf}
-    ${If} $RecoveryPath == ""
-      StrCpy $DeleteRecoveryOnInstall "0"
-      StrCpy $UseExistingDataLock "0"
-      StrCpy $RecoverMode "0"
+        StrCpy $DeleteRecoveryOnInstall "0"
+        StrCpy $RecoverMode "1"
+      prompt_done:
     ${EndIf}
   ${EndIf}
 
   nsDialogs::Create 1018
   Pop $0
 
-  ${NSD_CreateLabel} 0 0 100% 24u "Choose where application data (SQLite DB, alert audio) is stored (system.data-dir)."
-  ${NSD_CreateHLine} 0 28u 100% 1u ""
-  ${NSD_CreateLabel} 0 36u 38% 10u "Data directory"
-  ${NSD_CreateText} 38% 34u 52% 12u "$DataDir"
-  Pop $HEditDataDir
-  ${NSD_CreateBrowseButton} 92% 33u 8% 14u "..."
-  Pop $HBrowseDataDir
-  ${NSD_OnClick} $HBrowseDataDir BrowseDataDir
+  ${NSD_CreateLabel} 0 0 100% 28u "Data location (fixed — cannot be changed):$\r$\n$DataDir"
+  ${NSD_CreateHLine} 0 32u 100% 1u ""
 
-  ${NSD_CreateLabel} 0 52u 100% 40u ""
+  ${NSD_CreateLabel} 0 40u 100% 48u ""
   Pop $HLabelRecovery
   ${If} $UseExistingDataLock == "1"
-    ${NSD_SetText} $HLabelRecovery "Using your existing database at:$\r$\n$RecoveryPath$\r$\n(Data location is fixed for this install.)"
+    ${NSD_SetText} $HLabelRecovery "Recovering existing database. Admin username and password in the database are unchanged — do not set new credentials below (fields are disabled)."
   ${Else}
-    ${If} $RecoveryPath != ""
-    ${AndIf} $DeleteRecoveryOnInstall == "1"
-      ${NSD_SetText} $HLabelRecovery "The previously detected folder will be removed during install:$\r$\n$RecoveryPath$\r$\nSet the new data directory below."
+    ${If} $DeleteRecoveryOnInstall == "1"
+      ${NSD_SetText} $HLabelRecovery "Previous data will be removed. Enter a new initial admin account for the new database."
     ${Else}
-      ${NSD_SetText} $HLabelRecovery "No existing factory-monitor-data folder was found on any drive (fresh install)."
+      ${NSD_SetText} $HLabelRecovery "Fresh install: enter the initial admin account for the new database."
     ${EndIf}
   ${EndIf}
 
-  ${If} $UseExistingDataLock == "1"
-    System::Call 'user32::EnableWindow(p $HEditDataDir, i 0)'
-    System::Call 'user32::EnableWindow(p $HBrowseDataDir, i 0)'
-  ${EndIf}
+  ${NSD_CreateHLine} 0 96u 100% 1u ""
 
-  ${NSD_CreateHLine} 0 98u 100% 1u ""
-
-  ${NSD_CreateLabel} 0 110u 48% 10u "Initial admin username"
-  ${NSD_CreateText} 52% 108u 48% 12u "$InitialUser"
+  ${NSD_CreateLabel} 0 104u 48% 10u "Initial admin username"
+  Pop $HLabelUser
+  ${NSD_CreateText} 52% 102u 48% 12u "$InitialUser"
   Pop $HEditUser
-  ${NSD_CreateLabel} 0 126u 48% 10u "Initial admin password (first DB only)"
-  ${NSD_CreateText} 52% 124u 48% 12u "$InitialPass"
+  ${NSD_CreateLabel} 0 120u 48% 10u "Initial admin password"
+  Pop $HLabelPass
+  ${NSD_CreateText} 52% 118u 48% 12u "$InitialPass"
   Pop $HEditPass
 
-  ${NSD_CreateLabel} 0 142u 48% 10u "Dashboard alert repeat (minutes)"
-  ${NSD_CreateText} 52% 140u 48% 12u "$AlertRepeatMin"
+  ${If} $UseExistingDataLock == "1"
+    ShowWindow $HLabelUser 0
+    ShowWindow $HEditUser 0
+    ShowWindow $HLabelPass 0
+    ShowWindow $HEditPass 0
+  ${EndIf}
+
+  ${NSD_CreateLabel} 0 136u 48% 10u "Dashboard alert repeat (minutes)"
+  ${NSD_CreateText} 52% 134u 48% 12u "$AlertRepeatMin"
   Pop $HEditRepeat
-  ${NSD_CreateLabel} 0 158u 48% 10u "Dashboard alert max repeats"
-  ${NSD_CreateText} 52% 156u 48% 12u "$AlertMaxRepeats"
+  ${NSD_CreateLabel} 0 152u 48% 10u "Dashboard alert max repeats"
+  ${NSD_CreateText} 52% 150u 48% 12u "$AlertMaxRepeats"
   Pop $HEditMaxRep
 
-  ${NSD_CreateHLine} 0 174u 100% 1u ""
-  ${NSD_CreateLabel} 0 182u 100% 12u "Modbus RTU (serial port on next page)"
-  ${NSD_CreateLabel} 0 198u 48% 10u "Input slave ID"
-  ${NSD_CreateText} 52% 196u 48% 12u "$ModbusSlaveId"
+  ${NSD_CreateHLine} 0 168u 100% 1u ""
+  ${NSD_CreateLabel} 0 176u 100% 12u "Modbus RTU (serial port on next page)"
+  ${NSD_CreateLabel} 0 192u 48% 10u "Input slave ID"
+  ${NSD_CreateText} 52% 190u 48% 12u "$ModbusSlaveId"
   Pop $HEditSlave
-  ${NSD_CreateLabel} 0 214u 48% 10u "Baud rate"
-  ${NSD_CreateText} 52% 212u 48% 12u "$ModbusBaud"
+  ${NSD_CreateLabel} 0 208u 48% 10u "Baud rate"
+  ${NSD_CreateText} 52% 206u 48% 12u "$ModbusBaud"
   Pop $HEditBaud
-  ${NSD_CreateLabel} 0 230u 48% 10u "Stop bits"
-  ${NSD_CreateText} 52% 228u 48% 12u "$ModbusStopBits"
+  ${NSD_CreateLabel} 0 224u 48% 10u "Stop bits"
+  ${NSD_CreateText} 52% 222u 48% 12u "$ModbusStopBits"
   Pop $HEditStop
-  ${NSD_CreateLabel} 0 246u 48% 10u "Poll interval (ms)"
-  ${NSD_CreateText} 52% 244u 48% 12u "$ModbusPollMs"
+  ${NSD_CreateLabel} 0 240u 48% 10u "Poll interval (ms)"
+  ${NSD_CreateText} 52% 238u 48% 12u "$ModbusPollMs"
   Pop $HEditPoll
 
   nsDialogs::Show
 FunctionEnd
 
-Function BrowseDataDir
-  nsDialogs::SelectFolderDialog /NOUNLOAD "$DataDir" "Select data directory"
-  Pop $0
-  ${If} $0 != error
-    StrCpy $DataDir $0
-    ${NSD_SetText} $HEditDataDir $DataDir
-  ${EndIf}
-FunctionEnd
-
 Function PageConfigLeave
   ${IfNot} ${Silent}
-    ${NSD_GetText} $HEditDataDir $DataDir
-    ${NSD_GetText} $HEditUser $InitialUser
-    ${NSD_GetText} $HEditPass $InitialPass
+    ${If} $UseExistingDataLock != "1"
+      ${NSD_GetText} $HEditUser $InitialUser
+      ${NSD_GetText} $HEditPass $InitialPass
+    ${EndIf}
     ${NSD_GetText} $HEditRepeat $AlertRepeatMin
     ${NSD_GetText} $HEditMaxRep $AlertMaxRepeats
     ${NSD_GetText} $HEditSlave $ModbusSlaveId
@@ -298,13 +225,18 @@ Function PageConfigLeave
     ${NSD_GetText} $HEditStop $ModbusStopBits
     ${NSD_GetText} $HEditPoll $ModbusPollMs
   ${EndIf}
-  ${If} $UseExistingDataLock == "1"
-    StrCpy $DataDir $RecoveryPath
-  ${EndIf}
 
-  ${If} $DataDir == ""
-    MessageBox MB_ICONEXCLAMATION "Data directory cannot be empty."
-    Abort
+  StrCpy $DataDir "$PROFILE\factory-monitor-data"
+
+  ${If} $UseExistingDataLock != "1"
+    ${If} $InitialUser == ""
+      MessageBox MB_ICONEXCLAMATION "Enter an initial admin username."
+      Abort
+    ${EndIf}
+    ${If} $InitialPass == ""
+      MessageBox MB_ICONEXCLAMATION "Enter an initial admin password."
+      Abort
+    ${EndIf}
   ${EndIf}
 
   Call ValidatePositiveInt
@@ -436,13 +368,17 @@ Function PagePortsLeave
 FunctionEnd
 
 Function WriteAppConfig
-  ; Overrides only — merged with application.properties inside the Spring Boot JAR (SQLite path uses ${system.data-dir}).
+  ; Spring Boot .properties: backslashes like \f in \factory-... are escapes — use forward slashes.
+  ${StrRep} $R9 $DataDir "\" "/"
   CreateDirectory "$INSTDIR\config"
   FileOpen $0 "$INSTDIR\config\application.properties" w
-  FileWrite $0 "# Generated by Factory Monitor installer (merged with defaults in the application JAR)$\r$\n"
-  FileWrite $0 "system.data-dir=$DataDir$\r$\n"
-  FileWrite $0 "system.security.initial-username=$InitialUser$\r$\n"
-  FileWrite $0 "system.security.initial-password=$InitialPass$\r$\n"
+  FileWrite $0 "# Generated by Factory Monitor installer$\r$\n"
+  FileWrite $0 "system.data-dir=$R9$\r$\n"
+  FileWrite $0 "logging.pattern.console=$\r$\n"
+  ${If} $UseExistingDataLock != "1"
+    FileWrite $0 "system.security.initial-username=$InitialUser$\r$\n"
+    FileWrite $0 "system.security.initial-password=$InitialPass$\r$\n"
+  ${EndIf}
   FileWrite $0 "system.dashboard-alert-repeat-interval-minutes=$AlertRepeatMin$\r$\n"
   FileWrite $0 "system.dashboard-alert-max-repeats=$AlertMaxRepeats$\r$\n"
   FileWrite $0 "system.modbus.input-slave-id=$ModbusSlaveId$\r$\n"
@@ -455,10 +391,10 @@ FunctionEnd
 
 Function WriteInstallLog
   FileOpen $LogFile "$INSTDIR\install.log" a
-  FileWrite $LogFile "--- $Date $Time ---$\r$\n"
   FileWrite $LogFile "INSTDIR=$INSTDIR$\r$\n"
   FileWrite $LogFile "DataDir=$DataDir$\r$\n"
   FileWrite $LogFile "RecoverMode=$RecoverMode$\r$\n"
+  FileWrite $LogFile "UseExistingDataLock=$UseExistingDataLock$\r$\n"
   FileWrite $LogFile "DeleteRecoveryOnInstall=$DeleteRecoveryOnInstall$\r$\n"
   FileWrite $LogFile "Port=$PortManual$\r$\n"
   FileClose $LogFile
@@ -470,9 +406,9 @@ Section "Application" SecApp
   FileWrite $LogFile "Factory Monitor installer log$\r$\n"
   FileClose $LogFile
 
+  StrCpy $DataDir "$PROFILE\factory-monitor-data"
   ${If} $DeleteRecoveryOnInstall == "1"
-  ${AndIf} $RecoveryPath != ""
-    RMDir /r "$RecoveryPath"
+    RMDir /r "$DataDir"
   ${EndIf}
 
   File /r "${APP_SOURCE_DIR}\*.*"

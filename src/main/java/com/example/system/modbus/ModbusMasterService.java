@@ -1,15 +1,17 @@
 package com.example.system.modbus;
 
-import com.example.system.config.ModbusProperties;
-import com.ghgande.j2mod.modbus.facade.ModbusSerialMaster;
-import com.ghgande.j2mod.modbus.procimg.InputRegister;
-import com.ghgande.j2mod.modbus.util.SerialParameters;
-import jakarta.annotation.PreDestroy;
+import java.util.concurrent.locks.ReentrantLock;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.util.concurrent.locks.ReentrantLock;
+import com.example.system.config.ModbusProperties;
+import com.ghgande.j2mod.modbus.facade.ModbusSerialMaster;
+import com.ghgande.j2mod.modbus.procimg.InputRegister;
+import com.ghgande.j2mod.modbus.util.SerialParameters;
+
+import jakarta.annotation.PreDestroy;
 
 /**
  * FC04 input register read from {@link ModbusProperties#getInputSlaveId()}, and FC05 coil writes to
@@ -193,6 +195,21 @@ public class ModbusMasterService {
         } finally {
             lock.unlock();
         }
+    }
+
+    /**
+     * Updates the serial port, disconnects, and attempts a new connection (used after saving device settings).
+     */
+    public void reconnect(String newPortName) {
+        lock.lock();
+        try {
+            props.setPortName(newPortName);
+            disconnectUnlocked();
+            lastError = null;
+        } finally {
+            lock.unlock();
+        }
+        ensureConnected();
     }
 
     @PreDestroy

@@ -28,7 +28,7 @@ $RepoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $RepoRoot
 
 $JarName = "factory-monitor-0.0.1-SNAPSHOT.jar"
-$JarPath = Join-Path $RepoRoot "target" $JarName
+$JarPath = Join-Path (Join-Path $RepoRoot "target") $JarName
 $StageDir = Join-Path $PSScriptRoot "stage"
 $AppImageDir = Join-Path $StageDir "FactoryMonitor"
 
@@ -56,6 +56,7 @@ if (Test-Path -LiteralPath $AppImageDir) {
 }
 New-Item -ItemType Directory -Path $StageDir -Force | Out-Null
 
+# Do not add --win-console here — the desktop launcher should not show a console window.
 & jpackage `
     --type app-image `
     --name FactoryMonitor `
@@ -80,7 +81,7 @@ if (-not $makensis) {
     Write-Error "makensis not found. Install NSIS 3+ and add it to PATH."
 }
 
-& makensis /DAPP_SOURCE_DIR=stage\FactoryMonitor (Join-Path $PSScriptRoot "nsis\factory-monitor-installer.nsi")
+& makensis "/DAPP_SOURCE_DIR=$AppImageDir" (Join-Path $PSScriptRoot "nsis\factory-monitor-installer.nsi")
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 $Out = Join-Path $RepoRoot "target\factory-monitor-installer.exe"

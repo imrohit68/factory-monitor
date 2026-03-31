@@ -233,7 +233,7 @@ public class WorkstationAdminService {
 
     private Optional<String> validateBits(WorkstationForm form, int maxBit) {
         int[] bits = {form.getEngInputBit(), form.getLeadInputBit(), form.getQcInputBit()};
-        String[] names = {"Engineer", "Leader", "Quality"};
+        String[] names = {"Engineer", "Leader", "Quality Controller"};
         for (int i = 0; i < bits.length; i++) {
             if (bits[i] < 0 || bits[i] > maxBit) {
                 return Optional.of(names[i] + " input bit must be 0–" + maxBit);
@@ -241,7 +241,7 @@ public class WorkstationAdminService {
         }
         if (bits[0] == bits[1] || bits[0] == bits[2] || bits[1] == bits[2]) {
             return Optional.of(
-                    "Each input bit can only be used once. Engineering, Leader, and Quality must each use a different bit so one physical input is not wired to multiple roles.");
+                    "Each input bit can only be used once. Engineering, Leader, and Quality Controller must each use a different bit so one physical input is not wired to multiple roles.");
         }
         int maxRelay = modbusProperties.getRelayChannelsPerSlave();
         int[] relays = {form.getEngRelay(), form.getLeadRelay(), form.getQcRelay()};
@@ -276,7 +276,7 @@ public class WorkstationAdminService {
         }
         if (es == qs && er == qr) {
             return Optional.of(
-                    "Engineering and Quality both use the same output (Modbus slave "
+                    "Engineering and Quality Controller both use the same output (Modbus slave "
                             + es
                             + ", relay "
                             + er
@@ -284,7 +284,7 @@ public class WorkstationAdminService {
         }
         if (ls == qs && lr == qr) {
             return Optional.of(
-                    "Leader and Quality both use the same output (Modbus slave "
+                    "Leader and Quality Controller both use the same output (Modbus slave "
                             + ls
                             + ", relay "
                             + lr
@@ -310,7 +310,7 @@ public class WorkstationAdminService {
         Optional<WorkstationSlot> inQ =
                 workstationService.findConflictingSlotForInputBit(form.getQcInputBit(), exQ);
         if (inQ.isPresent()) {
-            return Optional.of(inputBitConflictMessage("Quality", form.getQcInputBit(), inQ.get()));
+            return Optional.of(inputBitConflictMessage("Quality Controller", form.getQcInputBit(), inQ.get()));
         }
         Optional<WorkstationSlot> outE =
                 workstationService.findConflictingSlotForOutput(form.getEngSlave(), form.getEngRelay(), exE);
@@ -328,7 +328,7 @@ public class WorkstationAdminService {
                 workstationService.findConflictingSlotForOutput(form.getQcSlave(), form.getQcRelay(), exQ);
         if (outQ.isPresent()) {
             return Optional.of(
-                    outputConflictMessage("Quality", form.getQcSlave(), form.getQcRelay(), outQ.get()));
+                    outputConflictMessage("Quality Controller", form.getQcSlave(), form.getQcRelay(), outQ.get()));
         }
         return Optional.empty();
     }
@@ -344,7 +344,7 @@ public class WorkstationAdminService {
         return switch (role) {
             case ENGINEER -> "Engineering";
             case LEADER -> "Leader";
-            case QUALITY -> "Quality";
+            case QUALITY -> "Quality Controller";
         };
     }
 

@@ -26,6 +26,7 @@ public class DataDirectoryInitializer implements ApplicationContextInitializer<C
         }
         try {
             Files.createDirectories(Path.of(dataDir));
+            Files.createDirectories(Path.of(dataDir, "logs"));
             Files.createDirectories(Path.of(audioDir));
         } catch (IOException e) {
             throw new IllegalStateException(

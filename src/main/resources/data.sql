@@ -1,28 +1,29 @@
--- Default factory grid (replaces former DefaultWorkstationSeedService Java seed).
--- 16 columns WC1..WC16: Engineer bits 0..15 / Leader 16..31 / Quality 32..47;
--- relays 1..32 on output slave 2, 33..48 on output slave 3 (Quality uses relay 1..16 on slave 3).
--- Idempotent: skips workstation insert if any workstation exists; skips slot insert if any slot exists.
--- Edit output slave IDs (2 and 3 in the UNION below) if they differ from your Modbus relay boards.
--- SQL written for SQLite (scalar subquery for workstation_id avoids JOIN/UNION quirks).
+-- Default factory grid: workstations named 1–12, then 21–25 (17 columns).
+-- Input bits: per workstation, 3 consecutive bits — ENGINEER, LEADER, QUALITY (Quality Controller role)
+--   (WS "1" → bits 0,1,2; WS "2" → 3,4,5; … up to WS "25" → 48,49,50).
+-- Output relays: slave 1 uses channels 1–30 in order (first 10 workstations),
+--   then slave 2 uses channels 1–21 in order (remaining 7 workstations).
+-- Idempotent: skips if any workstation / slot already exists.
 
 INSERT INTO workstation (name, sort_order, enabled)
 SELECT * FROM (
-    SELECT 'WC1' AS name, 0 AS sort_order, 1 AS enabled UNION ALL
-    SELECT 'WC2', 1, 1 UNION ALL
-    SELECT 'WC3', 2, 1 UNION ALL
-    SELECT 'WC4', 3, 1 UNION ALL
-    SELECT 'WC5', 4, 1 UNION ALL
-    SELECT 'WC6', 5, 1 UNION ALL
-    SELECT 'WC7', 6, 1 UNION ALL
-    SELECT 'WC8', 7, 1 UNION ALL
-    SELECT 'WC9', 8, 1 UNION ALL
-    SELECT 'WC10', 9, 1 UNION ALL
-    SELECT 'WC11', 10, 1 UNION ALL
-    SELECT 'WC12', 11, 1 UNION ALL
-    SELECT 'WC13', 12, 1 UNION ALL
-    SELECT 'WC14', 13, 1 UNION ALL
-    SELECT 'WC15', 14, 1 UNION ALL
-    SELECT 'WC16', 15, 1
+    SELECT '1' AS name, 0 AS sort_order, 1 AS enabled UNION ALL
+    SELECT '2', 1, 1 UNION ALL
+    SELECT '3', 2, 1 UNION ALL
+    SELECT '4', 3, 1 UNION ALL
+    SELECT '5', 4, 1 UNION ALL
+    SELECT '6', 5, 1 UNION ALL
+    SELECT '7', 6, 1 UNION ALL
+    SELECT '8', 7, 1 UNION ALL
+    SELECT '9', 8, 1 UNION ALL
+    SELECT '10', 9, 1 UNION ALL
+    SELECT '11', 10, 1 UNION ALL
+    SELECT '12', 11, 1 UNION ALL
+    SELECT '21', 12, 1 UNION ALL
+    SELECT '22', 13, 1 UNION ALL
+    SELECT '23', 14, 1 UNION ALL
+    SELECT '24', 15, 1 UNION ALL
+    SELECT '25', 16, 1
 ) AS t
 WHERE NOT EXISTS (SELECT 1 FROM workstation);
 
@@ -35,53 +36,56 @@ SELECT
     slots.relay,
     NULL
 FROM (
-    SELECT 'WC1' AS ws_name, 'ENGINEER' AS role, 0 AS input_bit, 2 AS slave, 1 AS relay UNION ALL
-    SELECT 'WC1', 'LEADER', 16, 2, 17 UNION ALL
-    SELECT 'WC1', 'QUALITY', 32, 3, 1 UNION ALL
-    SELECT 'WC2', 'ENGINEER', 1, 2, 2 UNION ALL
-    SELECT 'WC2', 'LEADER', 17, 2, 18 UNION ALL
-    SELECT 'WC2', 'QUALITY', 33, 3, 2 UNION ALL
-    SELECT 'WC3', 'ENGINEER', 2, 2, 3 UNION ALL
-    SELECT 'WC3', 'LEADER', 18, 2, 19 UNION ALL
-    SELECT 'WC3', 'QUALITY', 34, 3, 3 UNION ALL
-    SELECT 'WC4', 'ENGINEER', 3, 2, 4 UNION ALL
-    SELECT 'WC4', 'LEADER', 19, 2, 20 UNION ALL
-    SELECT 'WC4', 'QUALITY', 35, 3, 4 UNION ALL
-    SELECT 'WC5', 'ENGINEER', 4, 2, 5 UNION ALL
-    SELECT 'WC5', 'LEADER', 20, 2, 21 UNION ALL
-    SELECT 'WC5', 'QUALITY', 36, 3, 5 UNION ALL
-    SELECT 'WC6', 'ENGINEER', 5, 2, 6 UNION ALL
-    SELECT 'WC6', 'LEADER', 21, 2, 22 UNION ALL
-    SELECT 'WC6', 'QUALITY', 37, 3, 6 UNION ALL
-    SELECT 'WC7', 'ENGINEER', 6, 2, 7 UNION ALL
-    SELECT 'WC7', 'LEADER', 22, 2, 23 UNION ALL
-    SELECT 'WC7', 'QUALITY', 38, 3, 7 UNION ALL
-    SELECT 'WC8', 'ENGINEER', 7, 2, 8 UNION ALL
-    SELECT 'WC8', 'LEADER', 23, 2, 24 UNION ALL
-    SELECT 'WC8', 'QUALITY', 39, 3, 8 UNION ALL
-    SELECT 'WC9', 'ENGINEER', 8, 2, 9 UNION ALL
-    SELECT 'WC9', 'LEADER', 24, 2, 25 UNION ALL
-    SELECT 'WC9', 'QUALITY', 40, 3, 9 UNION ALL
-    SELECT 'WC10', 'ENGINEER', 9, 2, 10 UNION ALL
-    SELECT 'WC10', 'LEADER', 25, 2, 26 UNION ALL
-    SELECT 'WC10', 'QUALITY', 41, 3, 10 UNION ALL
-    SELECT 'WC11', 'ENGINEER', 10, 2, 11 UNION ALL
-    SELECT 'WC11', 'LEADER', 26, 2, 27 UNION ALL
-    SELECT 'WC11', 'QUALITY', 42, 3, 11 UNION ALL
-    SELECT 'WC12', 'ENGINEER', 11, 2, 12 UNION ALL
-    SELECT 'WC12', 'LEADER', 27, 2, 28 UNION ALL
-    SELECT 'WC12', 'QUALITY', 43, 3, 12 UNION ALL
-    SELECT 'WC13', 'ENGINEER', 12, 2, 13 UNION ALL
-    SELECT 'WC13', 'LEADER', 28, 2, 29 UNION ALL
-    SELECT 'WC13', 'QUALITY', 44, 3, 13 UNION ALL
-    SELECT 'WC14', 'ENGINEER', 13, 2, 14 UNION ALL
-    SELECT 'WC14', 'LEADER', 29, 2, 30 UNION ALL
-    SELECT 'WC14', 'QUALITY', 45, 3, 14 UNION ALL
-    SELECT 'WC15', 'ENGINEER', 14, 2, 15 UNION ALL
-    SELECT 'WC15', 'LEADER', 30, 2, 31 UNION ALL
-    SELECT 'WC15', 'QUALITY', 46, 3, 15 UNION ALL
-    SELECT 'WC16', 'ENGINEER', 15, 2, 16 UNION ALL
-    SELECT 'WC16', 'LEADER', 31, 2, 32 UNION ALL
-    SELECT 'WC16', 'QUALITY', 47, 3, 16
+    SELECT '1' AS ws_name, 'ENGINEER' AS role, 0 AS input_bit, 1 AS slave, 1 AS relay UNION ALL
+    SELECT '1', 'LEADER', 1, 1, 2 UNION ALL
+    SELECT '1', 'QUALITY', 2, 1, 3 UNION ALL
+    SELECT '2', 'ENGINEER', 3, 1, 4 UNION ALL
+    SELECT '2', 'LEADER', 4, 1, 5 UNION ALL
+    SELECT '2', 'QUALITY', 5, 1, 6 UNION ALL
+    SELECT '3', 'ENGINEER', 6, 1, 7 UNION ALL
+    SELECT '3', 'LEADER', 7, 1, 8 UNION ALL
+    SELECT '3', 'QUALITY', 8, 1, 9 UNION ALL
+    SELECT '4', 'ENGINEER', 9, 1, 10 UNION ALL
+    SELECT '4', 'LEADER', 10, 1, 11 UNION ALL
+    SELECT '4', 'QUALITY', 11, 1, 12 UNION ALL
+    SELECT '5', 'ENGINEER', 12, 1, 13 UNION ALL
+    SELECT '5', 'LEADER', 13, 1, 14 UNION ALL
+    SELECT '5', 'QUALITY', 14, 1, 15 UNION ALL
+    SELECT '6', 'ENGINEER', 15, 1, 16 UNION ALL
+    SELECT '6', 'LEADER', 16, 1, 17 UNION ALL
+    SELECT '6', 'QUALITY', 17, 1, 18 UNION ALL
+    SELECT '7', 'ENGINEER', 18, 1, 19 UNION ALL
+    SELECT '7', 'LEADER', 19, 1, 20 UNION ALL
+    SELECT '7', 'QUALITY', 20, 1, 21 UNION ALL
+    SELECT '8', 'ENGINEER', 21, 1, 22 UNION ALL
+    SELECT '8', 'LEADER', 22, 1, 23 UNION ALL
+    SELECT '8', 'QUALITY', 23, 1, 24 UNION ALL
+    SELECT '9', 'ENGINEER', 24, 1, 25 UNION ALL
+    SELECT '9', 'LEADER', 25, 1, 26 UNION ALL
+    SELECT '9', 'QUALITY', 26, 1, 27 UNION ALL
+    SELECT '10', 'ENGINEER', 27, 1, 28 UNION ALL
+    SELECT '10', 'LEADER', 28, 1, 29 UNION ALL
+    SELECT '10', 'QUALITY', 29, 1, 30 UNION ALL
+    SELECT '11', 'ENGINEER', 30, 2, 1 UNION ALL
+    SELECT '11', 'LEADER', 31, 2, 2 UNION ALL
+    SELECT '11', 'QUALITY', 32, 2, 3 UNION ALL
+    SELECT '12', 'ENGINEER', 33, 2, 4 UNION ALL
+    SELECT '12', 'LEADER', 34, 2, 5 UNION ALL
+    SELECT '12', 'QUALITY', 35, 2, 6 UNION ALL
+    SELECT '21', 'ENGINEER', 36, 2, 7 UNION ALL
+    SELECT '21', 'LEADER', 37, 2, 8 UNION ALL
+    SELECT '21', 'QUALITY', 38, 2, 9 UNION ALL
+    SELECT '22', 'ENGINEER', 39, 2, 10 UNION ALL
+    SELECT '22', 'LEADER', 40, 2, 11 UNION ALL
+    SELECT '22', 'QUALITY', 41, 2, 12 UNION ALL
+    SELECT '23', 'ENGINEER', 42, 2, 13 UNION ALL
+    SELECT '23', 'LEADER', 43, 2, 14 UNION ALL
+    SELECT '23', 'QUALITY', 44, 2, 15 UNION ALL
+    SELECT '24', 'ENGINEER', 45, 2, 16 UNION ALL
+    SELECT '24', 'LEADER', 46, 2, 17 UNION ALL
+    SELECT '24', 'QUALITY', 47, 2, 18 UNION ALL
+    SELECT '25', 'ENGINEER', 48, 2, 19 UNION ALL
+    SELECT '25', 'LEADER', 49, 2, 20 UNION ALL
+    SELECT '25', 'QUALITY', 50, 2, 21
 ) AS slots
 WHERE NOT EXISTS (SELECT 1 FROM workstation_slot);

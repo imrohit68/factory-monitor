@@ -140,7 +140,7 @@ public class WorkstationService {
         return slotRepository.findConflictingSlotByOutput(slave, channel, excludeSlotId);
     }
 
-    /** Slots in role order (Engineer, Leader, Quality), then by id when roles match. */
+    /** Slots in role order (Engineer, Leader, Quality Controller), then by id when roles match. */
     public List<WorkstationSlot> getSlotsOrderedElq(Workstation w) {
         List<WorkstationSlot> list = new ArrayList<>(w.getSlots());
         list.sort(

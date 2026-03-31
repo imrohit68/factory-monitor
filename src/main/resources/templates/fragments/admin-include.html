@@ -50,12 +50,18 @@
         <iconify-icon icon="solar:download-linear" class="text-xl" th:classappend="${active == 'event-log'} ? 'text-gray-300' : 'text-gray-400'"></iconify-icon>
         Download Event Log
     </a>
+    <a th:href="@{/admin/device-config}"
+       th:classappend="${active == 'device-config'} ? ' bg-gray-900 text-white shadow-sm' : ' text-gray-600 hover:bg-gray-100'"
+       class="uc-motion flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-normal">
+        <iconify-icon icon="solar:usb-linear" class="text-xl" th:classappend="${active == 'device-config'} ? 'text-gray-300' : 'text-gray-400'"></iconify-icon>
+        Configure device
+    </a>
 </aside>
 
 <th:block th:fragment="roleCell (slot, tone)">
     <div th:if="${slot != null}" class="flex items-center gap-1.5 min-w-0">
         <span th:class="${'w-5 h-5 sm:w-6 sm:h-6 shrink-0 rounded flex items-center justify-center text-xs sm:text-sm font-semibold ' + (tone == 'amber' ? 'bg-amber-100 text-amber-800' : (tone == 'emerald' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'))}"
-              th:title="${tone == 'amber' ? 'Engineering' : (tone == 'emerald' ? 'Leader' : 'Quality')}"
+              th:title="${tone == 'amber' ? 'Engineering' : (tone == 'emerald' ? 'Leader' : 'Quality Controller')}"
               th:text="${tone == 'amber' ? 'E' : (tone == 'emerald' ? 'L' : 'Q')}">E</span>
         <span class="text-xs sm:text-sm text-gray-600 truncate min-w-0 leading-snug whitespace-nowrap"
               th:title="${'Input ' + slot.inputBitIndex + ', slave ' + slot.outputSlaveId + ', relay ' + slot.outputChannel}">

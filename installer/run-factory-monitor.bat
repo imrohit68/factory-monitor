@@ -108,12 +108,6 @@ if not "%SPRING_DATASOURCE_URL%"=="" set APP_ARGS=%APP_ARGS% "--spring.datasourc
 if not "%SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE%"=="" set APP_ARGS=%APP_ARGS% --spring.servlet.multipart.max-file-size=%SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE%
 if not "%SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE%"=="" set APP_ARGS=%APP_ARGS% --spring.servlet.multipart.max-request-size=%SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE%
 
-echo Starting Factory Monitor...
-echo JAR:  %JAR_PATH%
-echo Data: %SYSTEM_DATA_DIR%
-echo URL:  http://localhost:%SERVER_PORT%/
-echo.
-
 "%JAVA_EXE%" %JVM_OPTS% -jar "%JAR_PATH%" %APP_ARGS%
 
 endlocal
