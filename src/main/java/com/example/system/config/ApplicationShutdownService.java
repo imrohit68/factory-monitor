@@ -5,7 +5,7 @@ import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.stereotype.Service;
 
 /**
- * Stops the Spring context and exits the JVM so desktop / installer runs can be ended from the admin UI.
+ * Stops the Spring context and exits the JVM (e.g. stale browser-tab heartbeat shutdown).
  */
 @Service
 public class ApplicationShutdownService {
