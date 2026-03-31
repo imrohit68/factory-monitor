@@ -158,10 +158,10 @@ Function PageConfig
   nsDialogs::Create 1018
   Pop $0
 
-  ${NSD_CreateLabel} 0 0 100% 28u "Data folder (cannot be changed):$\r$\n$DataDir"
-  ${NSD_CreateHLine} 0 32u 100% 1u ""
+  ${NSD_CreateLabel} 0 0 100% 24u "Data folder (cannot be changed):$\r$\n$DataDir"
+  ${NSD_CreateHLine} 0 26u 100% 1u ""
 
-  ${NSD_CreateLabel} 0 38u 100% 44u ""
+  ${NSD_CreateLabel} 0 28u 100% 28u ""
   Pop $HLabelRecovery
   ${If} $UseExistingDataLock == "1"
     ${NSD_SetText} $HLabelRecovery "Using your existing database. Admin user and password are not changed. The fields below are turned off."
@@ -173,15 +173,15 @@ Function PageConfig
     ${EndIf}
   ${EndIf}
 
-  ${NSD_CreateHLine} 0 88u 100% 1u ""
+  ${NSD_CreateHLine} 0 58u 100% 1u ""
 
-  ${NSD_CreateLabel} 0 94u 100% 12u "Initial admin username"
+  ${NSD_CreateLabel} 0 60u 100% 10u "Initial admin username"
   Pop $HLabelUser
-  ${NSD_CreateText} 0 108u 100% 14u "$InitialUser"
+  ${NSD_CreateText} 0 72u 100% 12u "$InitialUser"
   Pop $HEditUser
-  ${NSD_CreateLabel} 0 128u 100% 12u "Initial admin password"
+  ${NSD_CreateLabel} 0 86u 100% 10u "Initial admin password"
   Pop $HLabelPass
-  ${NSD_CreateText} 0 142u 100% 14u "$InitialPass"
+  ${NSD_CreateText} 0 98u 100% 12u "$InitialPass"
   Pop $HEditPass
 
   ${If} $UseExistingDataLock == "1"
