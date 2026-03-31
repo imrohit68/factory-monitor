@@ -26,10 +26,13 @@ public final class LocalBrowserOpener {
             } else {
                 pb = new ProcessBuilder("xdg-open", url);
             }
-            pb.inheritIO();
+            pb.redirectError(ProcessBuilder.Redirect.DISCARD);
+            pb.redirectOutput(ProcessBuilder.Redirect.DISCARD);
+            pb.redirectInput(ProcessBuilder.Redirect.DISCARD);
             pb.start();
         } catch (IOException | SecurityException e) {
             log.warn("Could not open browser at {}: {}", url, e.getMessage());
         }
     }
 }
+

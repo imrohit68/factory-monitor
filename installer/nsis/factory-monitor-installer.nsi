@@ -38,6 +38,7 @@ ${StrRep}
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_DIRECTORY
 Page custom PageConfig PageConfigLeave
+Page custom PageAlert PageAlertLeave
 Page custom PageModbus PageModbusLeave
 Page custom PagePorts PagePortsLeave
 !insertmacro MUI_PAGE_INSTFILES
@@ -132,7 +133,7 @@ Function SilentFixedPathDefaults
 FunctionEnd
 
 Function PageConfig
-  !insertmacro MUI_HEADER_TEXT "Account and alerts" "Data folder is fixed under your profile. Set the admin login and dashboard alert timing."
+  !insertmacro MUI_HEADER_TEXT "Account" "Data folder is fixed under your profile. Set the admin login (next screen: dashboard alert timing)."
 
   StrCpy $DataDir "$PROFILE\factory-monitor-data"
 
@@ -160,7 +161,7 @@ Function PageConfig
   ${NSD_CreateLabel} 0 0 100% 28u "Data folder (cannot be changed):$\r$\n$DataDir"
   ${NSD_CreateHLine} 0 32u 100% 1u ""
 
-  ${NSD_CreateLabel} 0 38u 100% 52u ""
+  ${NSD_CreateLabel} 0 38u 100% 44u ""
   Pop $HLabelRecovery
   ${If} $UseExistingDataLock == "1"
     ${NSD_SetText} $HLabelRecovery "Using your existing database. Admin user and password are not changed. The fields below are turned off."
@@ -172,15 +173,15 @@ Function PageConfig
     ${EndIf}
   ${EndIf}
 
-  ${NSD_CreateHLine} 0 94u 100% 1u ""
+  ${NSD_CreateHLine} 0 88u 100% 1u ""
 
-  ${NSD_CreateLabel} 0 102u 48% 10u "Initial admin username"
+  ${NSD_CreateLabel} 0 94u 100% 12u "Initial admin username"
   Pop $HLabelUser
-  ${NSD_CreateText} 52% 100u 48% 12u "$InitialUser"
+  ${NSD_CreateText} 0 108u 100% 14u "$InitialUser"
   Pop $HEditUser
-  ${NSD_CreateLabel} 0 118u 48% 10u "Initial admin password"
+  ${NSD_CreateLabel} 0 128u 100% 12u "Initial admin password"
   Pop $HLabelPass
-  ${NSD_CreateText} 52% 116u 48% 12u "$InitialPass"
+  ${NSD_CreateText} 0 142u 100% 14u "$InitialPass"
   Pop $HEditPass
 
   ${If} $UseExistingDataLock == "1"
@@ -190,11 +191,21 @@ Function PageConfig
     ShowWindow $HEditPass 0
   ${EndIf}
 
-  ${NSD_CreateLabel} 0 134u 48% 10u "Dashboard alert repeat (minutes)"
-  ${NSD_CreateText} 52% 132u 48% 12u "$AlertRepeatMin"
+  nsDialogs::Show
+FunctionEnd
+
+Function PageAlert
+  !insertmacro MUI_HEADER_TEXT "Dashboard alerts" "How often alert sounds repeat while a workstation input stays on."
+
+  nsDialogs::Create 1018
+  Pop $0
+
+  ${NSD_CreateLabel} 0 0 100% 44u "While an alert stays on, the dashboard can replay the workstation sound.$\r$\n$\r$\nSet how many minutes to wait between each replay, and how many extra replays are allowed after the first play (use 0 for no extra repeats)."
+  ${NSD_CreateLabel} 0 50u 100% 14u "Minutes between replays"
+  ${NSD_CreateText} 0 66u 100% 14u "$AlertRepeatMin"
   Pop $HEditRepeat
-  ${NSD_CreateLabel} 0 150u 48% 10u "Dashboard alert max repeats"
-  ${NSD_CreateText} 52% 148u 48% 12u "$AlertMaxRepeats"
+  ${NSD_CreateLabel} 0 86u 100% 22u "Maximum extra repeats$\r$\n(0 = only the first play; higher = more replays while the input stays on)"
+  ${NSD_CreateText} 0 112u 100% 14u "$AlertMaxRepeats"
   Pop $HEditMaxRep
 
   nsDialogs::Show
@@ -206,18 +217,18 @@ Function PageModbus
   nsDialogs::Create 1018
   Pop $0
 
-  ${NSD_CreateLabel} 0 0 100% 24u "These values are saved to the app config file."
-  ${NSD_CreateLabel} 0 30u 48% 10u "Input slave ID"
-  ${NSD_CreateText} 52% 28u 48% 12u "$ModbusSlaveId"
+  ${NSD_CreateLabel} 0 0 100% 18u "These values are saved to the app config file."
+  ${NSD_CreateLabel} 0 22u 100% 10u "Input slave ID"
+  ${NSD_CreateText} 0 34u 100% 12u "$ModbusSlaveId"
   Pop $HEditSlave
-  ${NSD_CreateLabel} 0 46u 48% 10u "Baud rate"
-  ${NSD_CreateText} 52% 44u 48% 12u "$ModbusBaud"
+  ${NSD_CreateLabel} 0 50u 100% 10u "Baud rate"
+  ${NSD_CreateText} 0 62u 100% 12u "$ModbusBaud"
   Pop $HEditBaud
-  ${NSD_CreateLabel} 0 62u 48% 10u "Stop bits"
-  ${NSD_CreateText} 52% 60u 48% 12u "$ModbusStopBits"
+  ${NSD_CreateLabel} 0 78u 100% 10u "Stop bits"
+  ${NSD_CreateText} 0 90u 100% 12u "$ModbusStopBits"
   Pop $HEditStop
-  ${NSD_CreateLabel} 0 78u 48% 10u "Poll interval (ms)"
-  ${NSD_CreateText} 52% 76u 48% 12u "$ModbusPollMs"
+  ${NSD_CreateLabel} 0 106u 100% 10u "Poll interval (ms)"
+  ${NSD_CreateText} 0 118u 100% 12u "$ModbusPollMs"
   Pop $HEditPoll
 
   nsDialogs::Show
@@ -229,8 +240,6 @@ Function PageConfigLeave
       ${NSD_GetText} $HEditUser $InitialUser
       ${NSD_GetText} $HEditPass $InitialPass
     ${EndIf}
-    ${NSD_GetText} $HEditRepeat $AlertRepeatMin
-    ${NSD_GetText} $HEditMaxRep $AlertMaxRepeats
   ${EndIf}
 
   StrCpy $DataDir "$PROFILE\factory-monitor-data"
@@ -245,11 +254,18 @@ Function PageConfigLeave
       Abort
     ${EndIf}
   ${EndIf}
+FunctionEnd
+
+Function PageAlertLeave
+  ${IfNot} ${Silent}
+    ${NSD_GetText} $HEditRepeat $AlertRepeatMin
+    ${NSD_GetText} $HEditMaxRep $AlertMaxRepeats
+  ${EndIf}
 
   Call ValidateAlertInts
   Pop $0
   StrCmp $0 ok +3
-    MessageBox MB_ICONEXCLAMATION "Enter valid positive numbers for alert repeat and max repeats."
+    MessageBox MB_ICONEXCLAMATION "Enter valid positive numbers for repeat interval and max repeats."
     Abort
 FunctionEnd
 

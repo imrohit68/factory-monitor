@@ -12,6 +12,10 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @ConditionalOnProperty(name = "system.launch-browser", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(
+        name = "system.desktop-mode",
+        havingValue = "false",
+        matchIfMissing = true)
 public class BrowserLauncher {
 
     @Value("${server.port:8080}")

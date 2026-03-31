@@ -19,6 +19,12 @@ public class AppProperties {
     private int logRetentionDays = 30;
 
     /**
+     * {@code event_log} rows with {@code event_time} strictly older than this many calendar days are removed
+     * by a daily job. {@code 0} disables automatic purge.
+     */
+    private int eventLogPurgeRetentionDays = 30;
+
+    /**
      * Dashboard alert sound: wait this many minutes after a clip finishes before playing it again (while the
      * input stays active).
      */
