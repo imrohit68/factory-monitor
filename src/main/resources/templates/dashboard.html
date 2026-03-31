@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <link rel="icon" th:href="@{/images/app-logo.svg}" type="image/svg+xml"/>
+    <link rel="alternate icon" th:href="@{/favicon.ico}" type="image/x-icon"/>
     <title>Factory monitor Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
@@ -12,6 +14,7 @@
     <link rel="stylesheet" th:href="@{/css/app.css}"/>
     <link rel="stylesheet" th:href="@{/css/dashboard-matrix.css}"/>
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <th:block th:replace="~{fragments/desktop-heartbeat :: script}"/>
 </head>
 <body class="bg-[#FFF9F2] text-gray-900 h-screen overflow-hidden flex flex-col">
 

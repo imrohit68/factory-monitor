@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/admin-include :: head('Shutting down')}">
+    <title>Shutting down</title>
+</head>
+<body class="bg-[#FFF9F2] text-gray-900 min-h-screen flex flex-col antialiased font-sans text-base">
+
+<th:block th:replace="~{fragments/admin-include :: pageHeader}"/>
+
+<main class="flex-1 flex items-center justify-center px-6 py-16">
+    <div class="max-w-md text-center space-y-4">
+        <div class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-gray-100 text-gray-600 mx-auto">
+            <iconify-icon icon="solar:power-linear" class="text-3xl"></iconify-icon>
+        </div>
+        <h2 class="text-xl font-semibold text-gray-900">Shutting down</h2>
+        <p class="text-base text-gray-600 leading-relaxed">
+            Factory Monitor is stopping. You can close this browser tab. To run the app again, launch it the same way you usually start it (shortcut, Start menu, or terminal).
+        </p>
+    </div>
+</main>
+</body>
+</html>

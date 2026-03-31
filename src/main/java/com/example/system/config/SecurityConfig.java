@@ -24,6 +24,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/admin/**", "/report/**").authenticated()
                         .anyRequest().permitAll())
+                .csrf(csrf -> csrf.ignoringRequestMatchers("/internal/desktop-heartbeat"))
                 .formLogin(form -> form
                         .loginPage("/login")
                         .defaultSuccessUrl("/admin", false)

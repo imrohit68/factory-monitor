@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <link rel="icon" th:href="@{/images/app-logo.svg}" type="image/svg+xml"/>
+    <link rel="alternate icon" th:href="@{/favicon.ico}" type="image/x-icon"/>
     <title>Sign in — Factory monitor</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
@@ -13,6 +15,7 @@
     <style>
         body { font-family: 'Inter', sans-serif; }
     </style>
+    <th:block th:replace="~{fragments/desktop-heartbeat :: script}"/>
 </head>
 <body class="bg-[#FFF9F2] text-gray-900 min-h-screen flex flex-col">
 

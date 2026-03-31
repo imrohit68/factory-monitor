@@ -3,6 +3,8 @@
 <head th:fragment="head (pageTitle)">
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <link rel="icon" th:href="@{/images/app-logo.svg}" type="image/svg+xml"/>
+    <link rel="alternate icon" th:href="@{/favicon.ico}" type="image/x-icon"/>
     <title th:text="${pageTitle}">Admin</title>
     <link rel="preconnect" href="https://fonts.googleapis.com"/>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
@@ -18,6 +20,7 @@
         ::-webkit-scrollbar-thumb:hover { background: #d1d5db; }
         iconify-icon { display: inline-block; vertical-align: middle; }
     </style>
+    <th:block th:replace="~{fragments/desktop-heartbeat :: script}"/>
 </head>
 
 <header th:fragment="pageHeader" class="app-nav-bar shrink-0 z-30">
@@ -56,6 +59,15 @@
         <iconify-icon icon="solar:usb-linear" class="text-xl" th:classappend="${active == 'device-config'} ? 'text-gray-300' : 'text-gray-400'"></iconify-icon>
         Configure device
     </a>
+
+    <form th:action="@{/admin/shutdown}" method="post" class="mt-8 pt-6 border-t border-gray-200"
+          onsubmit="return confirm('Stop Factory Monitor on this computer? The app will exit until you start it again.');">
+        <button type="submit"
+                class="uc-motion w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-base font-normal text-red-700 bg-red-50 border border-red-100 hover:bg-red-100">
+            <iconify-icon icon="solar:power-linear" class="text-xl"></iconify-icon>
+            Quit application
+        </button>
+    </form>
 </aside>
 
 <th:block th:fragment="roleCell (slot, tone)">

@@ -31,6 +31,26 @@ public class AppProperties {
     private int dashboardAlertMaxRepeats = 4;
 
     /**
+     * If true, only one JVM may run per {@link #dataDir}; a second start opens the browser and exits.
+     */
+    private boolean singleInstance = false;
+
+    /**
+     * If true, the dashboard sends heartbeats; when they stop (tab closed), the process exits after
+     * {@link #getBrowserCloseGraceSeconds()}.
+     */
+    @Getter(AccessLevel.NONE)
+    private boolean exitOnBrowserClose = false;
+
+    /** No heartbeat for this long (after at least one heartbeat) triggers shutdown when exit-on-browser-close is on. */
+    @Getter(AccessLevel.NONE)
+    private int browserCloseGraceSeconds = 20;
+
+    /** Interval for dashboard heartbeat POSTs (seconds), exposed to the UI. */
+    @Getter(AccessLevel.NONE)
+    private int browserHeartbeatIntervalSeconds = 5;
+
+    /**
      * Root folder for persisted files: SQLite database and (unless overridden) uploaded alert audio.
      * Back up this directory to recover both DB and audio; DB references URLs like {@code /audio/uploads/...}
      * which map to files under {@link #getAudioUploadDir()}.
@@ -49,5 +69,17 @@ public class AppProperties {
             return audioUploadDir;
         }
         return Paths.get(dataDir, "alert-audio").toString();
+    }
+
+    public boolean isExitOnBrowserClose() {
+        return exitOnBrowserClose;
+    }
+
+    public int getBrowserCloseGraceSeconds() {
+        return browserCloseGraceSeconds;
+    }
+
+    public int getBrowserHeartbeatIntervalSeconds() {
+        return browserHeartbeatIntervalSeconds;
     }
 }
