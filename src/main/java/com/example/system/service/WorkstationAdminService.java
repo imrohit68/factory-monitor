@@ -64,21 +64,18 @@ public class WorkstationAdminService {
             form.setEngSlave(e.getOutputSlaveId());
             form.setEngRelay(e.getOutputChannel());
             form.setCurrentEngAudioPath(e.getAudioPath());
-            form.setEngAudioUrlManual(manualFromPath(e.getAudioPath()));
         }
         if (l != null) {
             form.setLeadInputBit(l.getInputBitIndex());
             form.setLeadSlave(l.getOutputSlaveId());
             form.setLeadRelay(l.getOutputChannel());
             form.setCurrentLeadAudioPath(l.getAudioPath());
-            form.setLeadAudioUrlManual(manualFromPath(l.getAudioPath()));
         }
         if (q != null) {
             form.setQcInputBit(q.getInputBitIndex());
             form.setQcSlave(q.getOutputSlaveId());
             form.setQcRelay(q.getOutputChannel());
             form.setCurrentQcAudioPath(q.getAudioPath());
-            form.setQcAudioUrlManual(manualFromPath(q.getAudioPath()));
         }
         form.setPlaceAfterWorkstationId(defaultPlaceAfterForEdit(w.getId()));
         return form;
@@ -94,17 +91,6 @@ public class WorkstationAdminService {
             prevId = w.getId();
         }
         return null;
-    }
-
-    /** Prefill manual URL field only for http(s); paths stay in "current" hint. */
-    public static String manualFromPath(String path) {
-        if (path == null || path.isBlank()) {
-            return "";
-        }
-        if (path.startsWith("http://") || path.startsWith("https://")) {
-            return path;
-        }
-        return "";
     }
 
     /** Full validation for save (bits, in-form uniqueness, cross-workstation conflicts). */
@@ -176,15 +162,9 @@ public class WorkstationAdminService {
         String leadAudio;
         String qcAudio;
         try {
-            engAudio =
-                    resolveSlotAudio(
-                            form.isClearEngAudio(), engAudioFile, form.getEngAudioUrlManual(), prevE, isNew);
-            leadAudio =
-                    resolveSlotAudio(
-                            form.isClearLeadAudio(), leadAudioFile, form.getLeadAudioUrlManual(), prevL, isNew);
-            qcAudio =
-                    resolveSlotAudio(
-                            form.isClearQcAudio(), qcAudioFile, form.getQcAudioUrlManual(), prevQ, isNew);
+            engAudio = resolveSlotAudio(form.isClearEngAudio(), engAudioFile, prevE, isNew);
+            leadAudio = resolveSlotAudio(form.isClearLeadAudio(), leadAudioFile, prevL, isNew);
+            qcAudio = resolveSlotAudio(form.isClearQcAudio(), qcAudioFile, prevQ, isNew);
         } catch (IOException e) {
             return Optional.of("Could not save audio file: " + e.getMessage());
         }
@@ -208,12 +188,7 @@ public class WorkstationAdminService {
         return Optional.empty();
     }
 
-    private String resolveSlotAudio(
-            boolean clear,
-            MultipartFile upload,
-            String manualUrl,
-            String previousPath,
-            boolean isNew)
+    private String resolveSlotAudio(boolean clear, MultipartFile upload, String previousPath, boolean isNew)
             throws IOException {
         if (clear) {
             return null;
@@ -221,9 +196,6 @@ public class WorkstationAdminService {
         String uploaded = audioStorageService.storeUpload(upload);
         if (uploaded != null) {
             return uploaded;
-        }
-        if (manualUrl != null && !manualUrl.isBlank()) {
-            return manualUrl.trim();
         }
         if (!isNew && previousPath != null && !previousPath.isBlank()) {
             return previousPath;

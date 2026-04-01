@@ -52,7 +52,7 @@ public class WorkstationSlot {
     @Column(name = "output_channel", nullable = false)
     private int outputChannel;
 
-    /** Optional alert sound for this channel only (URL path e.g. /audio/uploads/… or https://…). */
+    /** Optional alert sound for this channel (typically {@code /audio/uploads/…} from upload; legacy rows may store an absolute URL). */
     @Column(name = "audio_path", length = 512)
     private String audioPath;
 
