@@ -4,7 +4,7 @@ body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
 .dashboard-project-title {
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     font-size: clamp(1.15rem, 2.8vw, 2.35rem);
-    color: #062a4a;
+    color: #305cde;
     margin: 0;
     padding: 0;
     white-space: nowrap;
@@ -162,9 +162,9 @@ body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
     height: 100%;
     min-height: inherit;
 }
-/* Unlit / input low */
+/* Unlit / input low — neutral grey (#d4d4d4) for consistent appearance across displays. */
 .matrix-cell--off {
-    background: #d1d5db;
+    background: #d4d4d4;
 }
 .matrix-cell--e {
     background: #ffff00;
