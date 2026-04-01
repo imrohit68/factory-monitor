@@ -4,14 +4,14 @@
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Sign in — Production Calling System</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+    <script th:src="@{/vendor/tailwindcss-standalone.js}"></script>
+    <script th:src="@{/vendor/iconify-icon.min.js}"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com"/>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
     <link rel="stylesheet" th:href="@{/css/app.css}"/>
     <style>
-        body { font-family: 'Inter', sans-serif; }
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
     </style>
     <th:block th:replace="~{fragments/desktop-heartbeat :: script}"/>
 </head>
@@ -28,7 +28,8 @@
                 </div>
             </div>
         </div>
-        <a th:href="@{/}" class="uc-motion text-sm sm:text-base font-normal text-gray-500 hover:text-gray-900 flex items-center gap-2 shrink-0">
+        <a th:href="@{/(cb=${T(java.lang.System).currentTimeMillis()})}"
+           class="uc-motion text-sm sm:text-base font-normal text-gray-500 hover:text-gray-900 flex items-center gap-2 shrink-0">
             <iconify-icon icon="solar:monitor-linear" class="text-xl"></iconify-icon>
             <span class="hidden sm:inline">Return to Dashboard</span>
             <span class="sm:hidden">Dashboard</span>

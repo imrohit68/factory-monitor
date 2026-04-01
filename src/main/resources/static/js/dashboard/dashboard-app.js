@@ -28,14 +28,6 @@
 
     const { createApp } = Vue;
 
-    // Back-forward cache: Chrome/WebView can restore this page without re-running scripts.
-    // Vue then never mounts again → raw "{{ ... }}" in the DOM. Force a real reload.
-    window.addEventListener('pageshow', function (e) {
-        if (e.persisted) {
-            window.location.reload();
-        }
-    });
-
     createApp({
         data() {
             return {
@@ -88,7 +80,8 @@
                 _beforeUnloadHandler: null,
                 _gestureResumeAudio: null,
                 /** Shown when alert audio could not start (browser autoplay policy). Cleared after first successful play(). */
-                showAudioGestureHint: false
+                showAudioGestureHint: false,
+                _refreshInFlight: false
             };
         },
         mounted() {
@@ -619,8 +612,12 @@
                 this.tryPlayNextFromQueue();
             },
             async refresh() {
+                if (this._refreshInFlight) {
+                    return;
+                }
+                this._refreshInFlight = true;
                 try {
-                    const res = await fetch('/api/dashboard');
+                    const res = await fetch('/api/dashboard', { cache: 'no-store' });
                     if (!res.ok) {
                         console.warn('Dashboard refresh failed:', res.status);
                         return;
@@ -648,6 +645,8 @@
                     this.modbusError = j.modbusError || null;
                 } catch (e) {
                     console.error('Dashboard refresh error:', e);
+                } finally {
+                    this._refreshInFlight = false;
                 }
             }
         }

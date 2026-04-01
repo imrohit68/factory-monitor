@@ -1,5 +1,6 @@
 HELP.md
 target/
+.DS_Store
 # Windows installer build (jpackage staging; not part of what you ship)
 installer/stage/
 .mvn/wrapper/maven-wrapper.jar

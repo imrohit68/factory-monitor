@@ -18,10 +18,11 @@ public class DashboardController {
 
     @GetMapping("/")
     public String dashboard(Model model, HttpServletResponse response) {
-        // Avoid serving a stale dashboard shell from browser cache when user navigates back;
+        // Avoid serving a stale dashboard shell from browser/WebView cache when returning from admin;
         // without a fresh load, Vue may not run and raw {{ }} placeholders appear.
         response.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
         response.setHeader("Pragma", "no-cache");
+        response.setHeader("Expires", "0");
 
         model.addAttribute("modbusConnected", orchestration.isModbusConnected());
         model.addAttribute("modbusError", orchestration.getModbusLastError());

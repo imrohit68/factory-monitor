@@ -5,9 +5,13 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 @Configuration
 @EnableWebSecurity
@@ -30,7 +34,15 @@ public class SecurityConfig {
                         .defaultSuccessUrl("/admin", false)
                         .permitAll())
                 .logout(logout -> logout
-                        .logoutSuccessUrl("/")
+                        // Same cache-bust as manual "Return to Dashboard" links — fresh HTML + local /vendor/* scripts.
+                        .logoutSuccessHandler(
+                                (HttpServletRequest request,
+                                        HttpServletResponse response,
+                                        Authentication authentication) -> {
+                                    String ctx = request.getContextPath();
+                                    String url = (ctx == null ? "" : ctx) + "/?cb=" + System.currentTimeMillis();
+                                    response.sendRedirect(response.encodeRedirectURL(url));
+                                })
                         .permitAll())
                 .headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin));
         return http.build();

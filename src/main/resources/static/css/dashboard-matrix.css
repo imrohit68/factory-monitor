@@ -3,11 +3,12 @@ body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
 /* Center title between nav and matrix (matches board-style weight) */
 .dashboard-project-title {
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    font-size: clamp(1.35rem, 3.2vw, 2.35rem);
-    border-bottom: 4px solid #000;
-    padding-bottom: 0.35rem;
+    font-size: clamp(1.15rem, 2.8vw, 2.35rem);
+    color: #062a4a;
     margin: 0;
-    max-width: min(100%, 42rem);
+    padding: 0;
+    white-space: nowrap;
+    max-width: none;
 }
 /* Production matrix — matches physical board: 4×17, thick black grid */
 .matrix-table {

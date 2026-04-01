@@ -3,9 +3,26 @@
 <head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0"/>
+    <meta http-equiv="Pragma" content="no-cache"/>
     <title>Production Calling System — Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+    <script>
+        (function () {
+            function reloadIfRestored(e) {
+                if (e.persisted) {
+                    window.location.reload();
+                    return;
+                }
+                var nav = performance.getEntriesByType && performance.getEntriesByType('navigation')[0];
+                if (nav && nav.type === 'back_forward') {
+                    window.location.reload();
+                }
+            }
+            window.addEventListener('pageshow', reloadIfRestored);
+        })();
+    </script>
+    <script th:src="@{/vendor/tailwindcss-standalone.js}"></script>
+    <script th:src="@{/vendor/iconify-icon.min.js}"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com"/>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
@@ -15,12 +32,12 @@
         /* Hide Vue template until mounted — avoids raw {{ }} after bfcache / back without script re-run */
         [v-cloak] { display: none !important; }
     </style>
-    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script th:src="@{/vendor/vue.global.prod.js}"></script>
     <th:block th:replace="~{fragments/desktop-heartbeat :: script}"/>
 </head>
 <body class="bg-[#FFF9F2] text-gray-900 h-screen overflow-hidden flex flex-col">
 
-<!-- Ensures Tailwind CDN includes utilities used only from Vue :class -->
+<!-- Ensures Tailwind JIT sees utilities used only from Vue :class -->
 <div aria-hidden="true" class="hidden font-bold border border-gray-200 bg-gray-50 border-2 border-[#E6D82A] bg-[#FFF23E] border-[#4a9e44] bg-[#63BE5B] border-[#3d42b3] bg-[#4A54CF] hover:brightness-[0.97] brightness-[0.97] border-[#FFF23E]/60 border-[#63BE5B]/60 border-[#4A54CF]/60 bg-[#FFF23E]/20 bg-[#63BE5B]/20 bg-[#4A54CF]/20 text-gray-950 group/row group-hover/row:bg-gray-200 z-[60] hover:z-[35] translate-y-1.5 -translate-y-1.5 mb-1.5 mt-1.5 min-w-[7.5rem] max-w-[10.5rem] left-auto right-0 left-0 right-auto"></div>
 
 <div id="app" class="h-screen flex flex-col min-h-0" v-cloak
@@ -102,8 +119,8 @@
 
     <main class="uc-page-enter flex-1 w-full max-w-[1920px] mx-auto p-4 md:p-6 lg:p-8 flex flex-col gap-6 lg:gap-8 overflow-y-auto min-h-0">
 
-        <div class="shrink-0 flex justify-center px-2 pt-1 pb-2 md:pt-2 md:pb-3">
-            <p class="dashboard-project-title text-center font-bold uppercase tracking-[0.12em] text-gray-950 leading-tight"
+        <div class="shrink-0 flex justify-center px-2 pt-1 pb-2 md:pt-2 md:pb-3 w-full min-w-0 overflow-x-auto">
+            <p class="dashboard-project-title text-center font-bold uppercase tracking-[0.12em] leading-tight"
                aria-label="Production Calling System">
                 Production Calling System
             </p>
