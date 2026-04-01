@@ -1,5 +1,7 @@
 package com.example.system.modbus;
 
+import java.io.IOException;
+import java.util.Locale;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.slf4j.Logger;
@@ -22,6 +24,12 @@ import jakarta.annotation.PreDestroy;
 public class ModbusMasterService {
 
     private static final Logger log = LoggerFactory.getLogger(ModbusMasterService.class);
+
+    private enum UserErrorContext {
+        OPEN_PORT,
+        READ_INPUTS,
+        WRITE_OUTPUTS
+    }
 
     private final ModbusProperties props;
     private final ReentrantLock lock = new ReentrantLock();
@@ -62,8 +70,8 @@ public class ModbusMasterService {
             lastError = null;
             log.info("Modbus serial connected on {}", props.getPortName());
         } catch (Exception e) {
-            lastError = e.getMessage();
-            log.warn("Modbus connect failed: {}", e.getMessage());
+            lastError = toUserFacingMessage(e, UserErrorContext.OPEN_PORT);
+            log.warn("Modbus connect failed: {}", e.getMessage(), e);
             disconnectUnlocked();
         } finally {
             lock.unlock();
@@ -93,11 +101,12 @@ public class ModbusMasterService {
             }
             return bits;
         } catch (Exception e) {
-            lastError = e.getMessage();
+            lastError = toUserFacingMessage(e, UserErrorContext.READ_INPUTS);
             log.warn(
                     "Modbus FC04 read failed (inputSlave={}): {}",
                     props.getInputSlaveId(),
-                    e.getMessage());
+                    e.getMessage(),
+                    e);
             connected = false;
             try {
                 if (master != null) {
@@ -186,12 +195,13 @@ public class ModbusMasterService {
                     props.getCoilStartAddress(),
                     energized);
         } catch (Exception e) {
-            lastError = e.getMessage();
+            lastError = toUserFacingMessage(e, UserErrorContext.WRITE_OUTPUTS);
             log.warn(
                     "Modbus OUTPUT FC05 failed slave={} relay={}: {}",
                     outputSlaveId,
                     relayNumber,
-                    e.getMessage());
+                    e.getMessage(),
+                    e);
         } finally {
             lock.unlock();
         }
@@ -232,6 +242,66 @@ public class ModbusMasterService {
             }
             master = null;
         }
+    }
+
+    /**
+     * Short message for the dashboard and device screen. Full detail stays in logs.
+     */
+    static String toUserFacingMessage(Throwable e, UserErrorContext ctx) {
+        if (e == null) {
+            return fallbackForContext(ctx);
+        }
+        String raw = e.getMessage();
+        String lower = raw != null ? raw.toLowerCase(Locale.ROOT) : "";
+
+        if (lower.contains("invalid port descriptor")
+                || lower.contains("invalid port")
+                || lower.contains("could not open port")
+                || lower.contains("port not found")
+                || lower.contains("unknown port")
+                || (lower.contains("no such file") && lower.contains("dev"))
+                || lower.contains("gnu.io.portinuseexception")
+                || (lower.contains("jssc") && lower.contains("port"))) {
+            return "Unable to open the serial port. Check the USB connection and select the correct port under Configure device.";
+        }
+        if (lower.contains("permission denied")
+                || lower.contains("access denied")
+                || lower.contains("operation not permitted")) {
+            return "Unable to access the serial port. Close other apps using this device or check port permissions.";
+        }
+        if (lower.contains("timeout") || lower.contains("timed out") || lower.contains("time out")) {
+            return "Unable to read inputs: the device did not respond in time. Check wiring, power, and Modbus settings.";
+        }
+        if (lower.contains("broken pipe")
+                || lower.contains("not connected")
+                || lower.contains("connection reset")
+                || lower.contains("i/o error")
+                || lower.contains("io error")) {
+            return fallbackForContext(ctx);
+        }
+        if (e instanceof IOException) {
+            return fallbackForContext(ctx);
+        }
+        if (lower.contains("modbus")
+                || lower.contains("slave")
+                || lower.contains("exception response")
+                || lower.contains("illegal data address")) {
+            return ctx == UserErrorContext.WRITE_OUTPUTS
+                    ? "Unable to update relay outputs. Check Modbus wiring, slave ID, and relay addresses."
+                    : "Unable to read inputs from the device. Check Modbus wiring, slave ID, and register settings.";
+        }
+
+        return fallbackForContext(ctx);
+    }
+
+    private static String fallbackForContext(UserErrorContext ctx) {
+        return switch (ctx) {
+            case OPEN_PORT ->
+                    "Unable to connect to the serial device. Check the USB connection and port under Configure device.";
+            case READ_INPUTS -> "Unable to read inputs from the connected device. Check the connection and settings.";
+            case WRITE_OUTPUTS ->
+                    "Unable to update relay outputs. Check the device connection and Modbus settings.";
+        };
     }
 
     static String normalizePort(String raw) {

@@ -45,6 +45,7 @@ public class FactoryMonitorDesktopApplication extends Application {
                     e.consume();
                     shutdown(stage);
                 });
+        applyDesktopFullscreen(stage);
         stage.show();
 
         try {
@@ -116,6 +117,14 @@ public class FactoryMonitorDesktopApplication extends Application {
         }
         String name = p.getProperty("spring.application.name", "factory-monitor");
         return humanizeAppName(name);
+    }
+
+    private static void applyDesktopFullscreen(Stage stage) {
+        if (!SingleInstanceSupport.isDesktopFullscreen()) {
+            return;
+        }
+        stage.setFullScreen(true);
+        log.info("Desktop window: exclusive fullscreen enabled (Esc exits fullscreen; set system.desktop-fullscreen=false for a normal window).");
     }
 
     static String humanizeAppName(String raw) {

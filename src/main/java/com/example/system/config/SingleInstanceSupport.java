@@ -30,6 +30,7 @@ public final class SingleInstanceSupport {
 
     private static volatile boolean singleInstanceEnabled;
     private static volatile boolean desktopMode;
+    private static volatile boolean desktopFullscreen = true;
     private static volatile int configuredPort = 8080;
     private static volatile int activationPort;
 
@@ -41,6 +42,14 @@ public final class SingleInstanceSupport {
 
     public static boolean isDesktopMode() {
         return desktopMode;
+    }
+
+    /**
+     * When {@link #isDesktopMode()} is true, whether the JavaFX stage should use exclusive fullscreen (no window
+     * frame; typically covers the taskbar until the OS shows it on edge hover).
+     */
+    public static boolean isDesktopFullscreen() {
+        return desktopFullscreen;
     }
 
     public static int getConfiguredPort() {
@@ -63,6 +72,7 @@ public final class SingleInstanceSupport {
     public static void prepareBeforeSpring(String[] args) {
         Properties defaults = loadClasspathApplicationProperties();
         desktopMode = resolveDesktopMode(defaults, args);
+        desktopFullscreen = resolveDesktopFullscreen(defaults, args);
         singleInstanceEnabled = resolveSingleInstance(defaults, args);
         configuredPort = resolvePort(defaults, args);
         activationPort = resolveActivationPort(defaults, args, configuredPort);
@@ -154,6 +164,17 @@ public final class SingleInstanceSupport {
                 System.getProperty("system.desktop-mode"),
                 defaults.getProperty("system.desktop-mode"));
         return v != null && Boolean.parseBoolean(v.trim());
+    }
+
+    private static boolean resolveDesktopFullscreen(Properties defaults, String[] args) {
+        String v = firstNonBlank(
+                argValue(args, "system.desktop-fullscreen"),
+                System.getProperty("system.desktop-fullscreen"),
+                defaults.getProperty("system.desktop-fullscreen"));
+        if (v == null || v.isBlank()) {
+            return true;
+        }
+        return Boolean.parseBoolean(v.trim());
     }
 
     private static boolean resolveSingleInstance(Properties defaults, String[] args) {

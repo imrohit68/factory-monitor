@@ -1,5 +1,6 @@
 package com.example.system.desktop;
 
+import com.example.system.config.SingleInstanceSupport;
 import javafx.application.Platform;
 import javafx.stage.Stage;
 import org.slf4j.Logger;
@@ -49,6 +50,9 @@ public final class InstanceActivationServer {
                     Platform.runLater(
                             () -> {
                                 stage.setIconified(false);
+                                if (SingleInstanceSupport.isDesktopFullscreen()) {
+                                    stage.setFullScreen(true);
+                                }
                                 stage.show();
                                 stage.toFront();
                                 stage.requestFocus();

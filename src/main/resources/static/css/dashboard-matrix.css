@@ -88,28 +88,27 @@ body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
 }
 .matrix__label {
     text-align: left !important;
-    padding: 0.35rem 0.5rem !important;
+    padding: 0.4rem 0.5rem !important;
     background: #fff !important;
     font-weight: 700;
-    min-height: 3.25rem;
+    min-height: 3.5rem;
 }
 .matrix__label-inner {
     display: flex;
-    justify-content: space-between;
     align-items: center;
     width: 100%;
-    gap: 0.35rem;
+    gap: 0.5rem;
     min-height: 2.75rem;
 }
 .matrix__label-text {
     /* Engineering row labels: ENGINEERS / LEADER / QUALITY / CONTROLLER */
-    font-size: clamp(0.55rem, 1.05vw, 0.80rem);
+    font-size: clamp(0.78rem, 1.85vw, 1.12rem);
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.03em;
-    line-height: 1.2;
+    letter-spacing: 0.02em;
+    line-height: 1.15;
     color: #000;
-    flex: 1;
+    flex: 1 1 auto;
     min-width: 0;
 }
 .matrix__label-text--stack {
@@ -118,12 +117,16 @@ body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
     align-items: flex-start;
     justify-content: center;
 }
+/* Fixed-width slot so E / L / Q share one vertical alignment, flush to the cell’s right padding. */
 .matrix__label-letter {
-    font-size: clamp(1.75rem, 4vw, 2.75rem);
+    display: block;
+    flex: 0 0 clamp(2.35rem, 5.25vw, 3.35rem);
+    width: clamp(2.35rem, 5.25vw, 3.35rem);
+    text-align: right;
+    font-size: clamp(1.9rem, 4.25vw, 2.9rem);
     font-weight: 700;
     line-height: 1;
     color: #000;
-    flex-shrink: 0;
 }
 .matrix-cell {
     position: relative;
