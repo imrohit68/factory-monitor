@@ -33,7 +33,7 @@
                 </div>
             </div>
         </div>
-        <a th:href="@{/(cb=${T(java.lang.System).currentTimeMillis()})}"
+        <a th:href="@{/(cb=${#dates.createNow().getTime()})}"
            class="uc-motion text-base font-normal text-gray-500 hover:text-gray-900 flex items-center gap-2 shrink-0">
             <iconify-icon icon="solar:monitor-linear" class="text-xl"></iconify-icon>
             <span class="hidden sm:inline">Return to Dashboard</span>

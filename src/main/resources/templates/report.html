@@ -11,7 +11,7 @@
     <header class="uc-header">
         <th:block th:replace="~{fragments/company-brand :: ucBrand}"/>
         <nav class="uc-nav">
-            <a class="btn-outline" th:href="@{/(cb=${T(java.lang.System).currentTimeMillis()})}">Dashboard</a>
+            <a class="btn-outline" th:href="@{/(cb=${#dates.createNow().getTime()})}">Dashboard</a>
         </nav>
     </header>
 
