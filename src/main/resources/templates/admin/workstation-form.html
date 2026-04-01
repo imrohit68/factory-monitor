@@ -79,7 +79,7 @@
                                 </div>
                             </div>
                             <div class="bg-white border border-gray-200 rounded-lg p-4"
-                                 th:with="engPlaySrc=${form.currentEngAudioPath}">
+                                 th:with="engPlaySrc=${form.currentEngAudioPath},engHasSaved=${form.currentEngAudioPath != null and not #strings.isEmpty(form.currentEngAudioPath)}">
                                 <div class="flex items-center justify-between mb-3">
                                     <div class="flex items-center gap-2 min-w-0">
                                         <label class="text-base font-normal text-gray-900 flex items-center gap-2">
@@ -87,10 +87,13 @@
                                             Alert Audio
                                         </label>
                                         <button type="button"
-                                                th:if="${engPlaySrc != null and not #strings.isEmpty(engPlaySrc)}"
-                                                th:attr="data-audio-src=${engPlaySrc}"
+                                                id="ws-play-eng"
+                                                th:attr="data-saved-audio-src=${engHasSaved ? engPlaySrc : ''}"
+                                                th:attrappend="data-audio-src=${engHasSaved ? engPlaySrc : ''}"
                                                 onclick="playWorkstationAudioPreview(this)"
-                                                class="uc-motion shrink-0 p-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200"
+                                                th:classappend="${engHasSaved} ? '' : ' opacity-40 pointer-events-none'"
+                                                th:disabled="${!engHasSaved}"
+                                                class="uc-motion shrink-0 p-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:pointer-events-none disabled:opacity-40"
                                                 title="Play alert audio">
                                             <iconify-icon icon="solar:play-circle-linear" class="text-xl"></iconify-icon>
                                         </button>
@@ -102,8 +105,9 @@
                                 </div>
                                 <p th:if="${form.id != null and form.currentEngAudioPath != null}" class="text-xs text-gray-500 mb-3" th:text="'Current: ' + ${form.currentEngAudioPath}"></p>
                                 <div class="space-y-2">
-                                    <label class="text-sm text-gray-600">Upload file (MP3, WAV, OGG)</label>
-                                    <input type="file" name="engAudioFile" accept="audio/*,.mp3,.wav,.ogg"
+                                    <label class="text-sm text-gray-600">Upload audio (MP3, M4A, WAV, OGG, AAC, …)</label>
+                                    <input type="file" name="engAudioFile" id="ws-file-eng"
+                                           accept=".mp3,.wav,.ogg,.oga,.opus,.m4a,.aac,.caf,.mp4,.webm,.flac"
                                            class="block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-medium"/>
                                 </div>
                             </div>
@@ -137,7 +141,7 @@
                                 </div>
                             </div>
                             <div class="bg-white border border-gray-200 rounded-lg p-4"
-                                 th:with="leadPlaySrc=${form.currentLeadAudioPath}">
+                                 th:with="leadPlaySrc=${form.currentLeadAudioPath},leadHasSaved=${form.currentLeadAudioPath != null and not #strings.isEmpty(form.currentLeadAudioPath)}">
                                 <div class="flex items-center justify-between mb-3">
                                     <div class="flex items-center gap-2 min-w-0">
                                         <label class="text-base font-normal text-gray-900 flex items-center gap-2">
@@ -145,10 +149,13 @@
                                             Alert Audio
                                         </label>
                                         <button type="button"
-                                                th:if="${leadPlaySrc != null and not #strings.isEmpty(leadPlaySrc)}"
-                                                th:attr="data-audio-src=${leadPlaySrc}"
+                                                id="ws-play-lead"
+                                                th:attr="data-saved-audio-src=${leadHasSaved ? leadPlaySrc : ''}"
+                                                th:attrappend="data-audio-src=${leadHasSaved ? leadPlaySrc : ''}"
                                                 onclick="playWorkstationAudioPreview(this)"
-                                                class="uc-motion shrink-0 p-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200"
+                                                th:classappend="${leadHasSaved} ? '' : ' opacity-40 pointer-events-none'"
+                                                th:disabled="${!leadHasSaved}"
+                                                class="uc-motion shrink-0 p-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:pointer-events-none disabled:opacity-40"
                                                 title="Play alert audio">
                                             <iconify-icon icon="solar:play-circle-linear" class="text-xl"></iconify-icon>
                                         </button>
@@ -160,8 +167,9 @@
                                 </div>
                                 <p th:if="${form.id != null and form.currentLeadAudioPath != null}" class="text-xs text-gray-500 mb-3" th:text="'Current: ' + ${form.currentLeadAudioPath}"></p>
                                 <div class="space-y-2">
-                                    <label class="text-sm text-gray-600">Upload file (MP3, WAV, OGG)</label>
-                                    <input type="file" name="leadAudioFile" accept="audio/*,.mp3,.wav,.ogg"
+                                    <label class="text-sm text-gray-600">Upload audio (MP3, M4A, WAV, OGG, AAC, …)</label>
+                                    <input type="file" name="leadAudioFile" id="ws-file-lead"
+                                           accept=".mp3,.wav,.ogg,.oga,.opus,.m4a,.aac,.caf,.mp4,.webm,.flac"
                                            class="block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-medium"/>
                                 </div>
                             </div>
@@ -195,7 +203,7 @@
                                 </div>
                             </div>
                             <div class="bg-white border border-gray-200 rounded-lg p-4"
-                                 th:with="qcPlaySrc=${form.currentQcAudioPath}">
+                                 th:with="qcPlaySrc=${form.currentQcAudioPath},qcHasSaved=${form.currentQcAudioPath != null and not #strings.isEmpty(form.currentQcAudioPath)}">
                                 <div class="flex items-center justify-between mb-3">
                                     <div class="flex items-center gap-2 min-w-0">
                                         <label class="text-base font-normal text-gray-900 flex items-center gap-2">
@@ -203,10 +211,13 @@
                                             Alert Audio
                                         </label>
                                         <button type="button"
-                                                th:if="${qcPlaySrc != null and not #strings.isEmpty(qcPlaySrc)}"
-                                                th:attr="data-audio-src=${qcPlaySrc}"
+                                                id="ws-play-qc"
+                                                th:attr="data-saved-audio-src=${qcHasSaved ? qcPlaySrc : ''}"
+                                                th:attrappend="data-audio-src=${qcHasSaved ? qcPlaySrc : ''}"
                                                 onclick="playWorkstationAudioPreview(this)"
-                                                class="uc-motion shrink-0 p-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200"
+                                                th:classappend="${qcHasSaved} ? '' : ' opacity-40 pointer-events-none'"
+                                                th:disabled="${!qcHasSaved}"
+                                                class="uc-motion shrink-0 p-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:pointer-events-none disabled:opacity-40"
                                                 title="Play alert audio">
                                             <iconify-icon icon="solar:play-circle-linear" class="text-xl"></iconify-icon>
                                         </button>
@@ -218,8 +229,9 @@
                                 </div>
                                 <p th:if="${form.id != null and form.currentQcAudioPath != null}" class="text-xs text-gray-500 mb-3" th:text="'Current: ' + ${form.currentQcAudioPath}"></p>
                                 <div class="space-y-2">
-                                    <label class="text-sm text-gray-600">Upload file (MP3, WAV, OGG)</label>
-                                    <input type="file" name="qcAudioFile" accept="audio/*,.mp3,.wav,.ogg"
+                                    <label class="text-sm text-gray-600">Upload audio (MP3, M4A, WAV, OGG, AAC, …)</label>
+                                    <input type="file" name="qcAudioFile" id="ws-file-qc"
+                                           accept=".mp3,.wav,.ogg,.oga,.opus,.m4a,.aac,.caf,.mp4,.webm,.flac"
                                            class="block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-medium"/>
                                 </div>
                             </div>
@@ -242,19 +254,94 @@
     </main>
 </div>
 <script>
-    function playWorkstationAudioPreview(btn) {
-        var src = btn && btn.getAttribute('data-audio-src');
-        if (!src) return;
-        if (window._wsAudioPreview) {
-            try {
-                window._wsAudioPreview.pause();
-            } catch (e) { /* ignore */ }
-            window._wsAudioPreview.src = '';
+    (function () {
+        var objectUrls = { eng: null, lead: null, qc: null };
+
+        function revokeSlot(slot) {
+            if (objectUrls[slot]) {
+                URL.revokeObjectURL(objectUrls[slot]);
+                objectUrls[slot] = null;
+            }
         }
-        var a = new Audio(src);
-        window._wsAudioPreview = a;
-        a.play().catch(function () { /* autoplay / decode errors */ });
-    }
+
+        function setPlayUi(btn, enabled) {
+            btn.disabled = !enabled;
+            btn.classList.toggle('opacity-40', !enabled);
+            btn.classList.toggle('pointer-events-none', !enabled);
+        }
+
+        window.playWorkstationAudioPreview = function (btn) {
+            if (!btn || btn.disabled) return;
+            var src = btn.getAttribute('data-audio-src');
+            if (!src) return;
+            if (window._wsAudioPreview) {
+                try {
+                    window._wsAudioPreview.pause();
+                } catch (e) { /* ignore */ }
+                window._wsAudioPreview.src = '';
+            }
+            var a = new Audio(src);
+            window._wsAudioPreview = a;
+            a.play().catch(function () { /* autoplay / decode errors */ });
+        };
+
+        function syncSlot(slot, fileInput, playBtn, clearCheckbox) {
+            revokeSlot(slot);
+            var saved = (playBtn.getAttribute('data-saved-audio-src') || '').trim();
+            var file = fileInput.files && fileInput.files[0];
+            var clearOn = clearCheckbox && clearCheckbox.checked;
+
+            if (file) {
+                var url = URL.createObjectURL(file);
+                objectUrls[slot] = url;
+                playBtn.setAttribute('data-audio-src', url);
+                setPlayUi(playBtn, true);
+                window.playWorkstationAudioPreview(playBtn);
+                return;
+            }
+
+            if (clearOn) {
+                playBtn.removeAttribute('data-audio-src');
+                setPlayUi(playBtn, false);
+                return;
+            }
+
+            if (saved) {
+                playBtn.setAttribute('data-audio-src', saved);
+                setPlayUi(playBtn, true);
+                return;
+            }
+
+            playBtn.removeAttribute('data-audio-src');
+            setPlayUi(playBtn, false);
+        }
+
+        function wire(slot, fileId, playId, clearName) {
+            var fi = document.getElementById(fileId);
+            var btn = document.getElementById(playId);
+            var clearEl = document.querySelector('input[type="checkbox"][name="' + clearName + '"]');
+            if (!fi || !btn) return;
+            var run = function () {
+                syncSlot(slot, fi, btn, clearEl);
+            };
+            fi.addEventListener('change', run);
+            if (clearEl) {
+                clearEl.addEventListener('change', run);
+            }
+            run();
+        }
+
+        function bootWorkstationAudioPreview() {
+            wire('eng', 'ws-file-eng', 'ws-play-eng', 'clearEngAudio');
+            wire('lead', 'ws-file-lead', 'ws-play-lead', 'clearLeadAudio');
+            wire('qc', 'ws-file-qc', 'ws-play-qc', 'clearQcAudio');
+        }
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', bootWorkstationAudioPreview);
+        } else {
+            bootWorkstationAudioPreview();
+        }
+    })();
 </script>
 </body>
 </html>
