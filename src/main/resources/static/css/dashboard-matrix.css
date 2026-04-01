@@ -23,6 +23,13 @@ body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
     padding: 0.35rem 0.2rem;
     min-height: 2.75rem;
 }
+/* Workstation / machine number columns (1, 2, WC1, …) — larger than default thead */
+.matrix-table thead th:not(.matrix__corner) {
+    font-size: clamp(1.05rem, 2.35vw, 1.55rem);
+    padding: 0.5rem 0.3rem;
+    min-height: 3.1rem;
+    letter-spacing: 0.02em;
+}
 /* Top-left: column vs row header labels, diagonal split (physical board style) */
 .matrix-table thead th.matrix__corner {
     position: relative;
