@@ -471,15 +471,17 @@ Section "Application" SecApp
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ProductionCallingSystem" "DisplayVersion" "${PRODUCT_VERSION}"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ProductionCallingSystem" "Publisher" "Production Calling System"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ProductionCallingSystem" "UninstallString" "$INSTDIR\Uninstall.exe"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ProductionCallingSystem" "DisplayIcon" "$INSTDIR\app-icon.ico"
   WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ProductionCallingSystem" "NoModify" 1
   WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ProductionCallingSystem" "NoRepair" 1
 SectionEnd
 
 Section "Shortcuts" SecShortcuts
   CreateDirectory "$SMPROGRAMS\Production Calling System"
-  CreateShortCut "$SMPROGRAMS\Production Calling System\Production Calling System.lnk" "$INSTDIR\ProductionCallingSystem.exe" "" "$INSTDIR" 0 SW_SHOWNORMAL "" "Production Calling System"
-  CreateShortCut "$SMPROGRAMS\Production Calling System\Uninstall Production Calling System.lnk" "$INSTDIR\Uninstall.exe" "" "$INSTDIR" 0
-  CreateShortCut "$DESKTOP\Production Calling System.lnk" "$INSTDIR\ProductionCallingSystem.exe" "" "$INSTDIR" 0 SW_SHOWNORMAL "" "Production Calling System"
+  ; Icon path must be an .exe or .ico file (was wrongly $INSTDIR folder, which yields blank icons).
+  CreateShortCut "$SMPROGRAMS\Production Calling System\Production Calling System.lnk" "$INSTDIR\ProductionCallingSystem.exe" "" "$INSTDIR\app-icon.ico" 0 SW_SHOWNORMAL "" "Production Calling System"
+  CreateShortCut "$SMPROGRAMS\Production Calling System\Uninstall Production Calling System.lnk" "$INSTDIR\Uninstall.exe" "" "$INSTDIR\app-icon.ico" 0 SW_SHOWNORMAL
+  CreateShortCut "$DESKTOP\Production Calling System.lnk" "$INSTDIR\ProductionCallingSystem.exe" "" "$INSTDIR\app-icon.ico" 0 SW_SHOWNORMAL "" "Production Calling System"
 SectionEnd
 
 Section Uninstall

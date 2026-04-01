@@ -18,6 +18,8 @@ import org.springframework.context.ConfigurableApplicationContext;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
@@ -123,17 +125,57 @@ public class FactoryMonitorDesktopApplication extends Application {
     }
 
     private static void applyStageIcon(Stage stage) {
-        try (InputStream in =
-                FactoryMonitorDesktopApplication.class
-                        .getClassLoader()
-                        .getResourceAsStream("static/images/app-logo.png")) {
-            if (in != null) {
-                byte[] png = in.readAllBytes();
-                stage.getIcons().add(new Image(new ByteArrayInputStream(png)));
-            }
-        } catch (IOException e) {
-            log.debug("Could not load window icon: {}", e.getMessage());
+        Image fromFile = tryLoadPngBesideLauncher();
+        if (fromFile != null && !fromFile.isError()) {
+            stage.getIcons().add(fromFile);
+            return;
         }
+        Image fromClasspath = tryLoadPngFromClasspath();
+        if (fromClasspath != null && !fromClasspath.isError()) {
+            stage.getIcons().add(fromClasspath);
+        }
+    }
+
+    /**
+     * jpackage install: {@code user.dir} is usually the folder containing {@code ProductionCallingSystem.exe};
+     * we copy {@code app-logo.png} there in the Windows build script.
+     */
+    private static Image tryLoadPngBesideLauncher() {
+        String userDir = System.getProperty("user.dir");
+        if (userDir == null || userDir.isBlank()) {
+            return null;
+        }
+        Path png = Path.of(userDir, "app-logo.png");
+        if (!Files.isRegularFile(png)) {
+            return null;
+        }
+        try {
+            return new Image(png.toUri().toString());
+        } catch (Exception e) {
+            log.debug("Could not load window icon from {}: {}", png, e.getMessage());
+            return null;
+        }
+    }
+
+    private static Image tryLoadPngFromClasspath() {
+        ClassLoader[] loaders = {
+            Thread.currentThread().getContextClassLoader(),
+            FactoryMonitorDesktopApplication.class.getClassLoader()
+        };
+        for (ClassLoader cl : loaders) {
+            if (cl == null) {
+                continue;
+            }
+            try (InputStream in = cl.getResourceAsStream("static/images/app-logo.png")) {
+                if (in != null) {
+                    byte[] png = in.readAllBytes();
+                    return new Image(new ByteArrayInputStream(png));
+                }
+            } catch (IOException e) {
+                log.debug("Could not load window icon from classpath: {}", e.getMessage());
+            }
+        }
+        return null;
     }
 
     private static void applyDesktopFullscreen(Stage stage) {

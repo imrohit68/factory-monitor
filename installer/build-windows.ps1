@@ -84,6 +84,18 @@ if (-not (Test-Path -LiteralPath $Exe)) {
     Write-Error "jpackage did not produce: $Exe"
 }
 
+# Ship branding next to the launcher: shortcuts and JavaFX load app-icon.ico / app-logo.png from here.
+# (jpackage --icon embeds in .exe, but a separate .ico keeps Start Menu / taskbar reliable.)
+$LogoPng = Join-Path $RepoRoot "src\main\resources\static\images\app-logo.png"
+if (Test-Path -LiteralPath $IconIco) {
+    Copy-Item -LiteralPath $IconIco -Destination (Join-Path $AppImageDir "app-icon.ico") -Force
+    Write-Host "==> Copied app-icon.ico into app image"
+}
+if (Test-Path -LiteralPath $LogoPng) {
+    Copy-Item -LiteralPath $LogoPng -Destination (Join-Path $AppImageDir "app-logo.png") -Force
+    Write-Host "==> Copied app-logo.png into app image (JavaFX window icon)"
+}
+
 Write-Host "==> NSIS (makensis)"
 Set-Location $PSScriptRoot
 $makensis = Get-Command makensis -ErrorAction SilentlyContinue

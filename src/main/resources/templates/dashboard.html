@@ -102,6 +102,13 @@
 
     <main class="uc-page-enter flex-1 w-full max-w-[1920px] mx-auto p-4 md:p-6 lg:p-8 flex flex-col gap-6 lg:gap-8 overflow-y-auto min-h-0">
 
+        <div class="shrink-0 flex justify-center px-2 pt-1 pb-2 md:pt-2 md:pb-3">
+            <p class="dashboard-project-title text-center font-bold uppercase tracking-[0.12em] text-gray-950 leading-tight"
+               aria-label="Production Calling System">
+                Production Calling System
+            </p>
+        </div>
+
         <div v-if="workstations.length === 0" class="flex flex-col items-center justify-center py-16 text-center text-gray-500 gap-3">
             <p class="font-medium">No workstations configured.</p>
             <a class="uc-motion text-blue-600 hover:underline font-semibold" th:href="@{/admin/workstations/new}">Add a workstation</a>
