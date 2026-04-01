@@ -288,21 +288,13 @@
             }
             var a = new Audio(src);
             window._wsAudioPreview = a;
-            var alerted = false;
-            function alertOnce(msg) {
-                if (alerted) return;
-                alerted = true;
-                window.alert(msg);
-            }
-            a.addEventListener('error', function () {
-                alertOnce(
-                    'Could not play this audio. OGG and some other formats are often not supported in the desktop app’s browser on Windows — use MP3 or WAV for reliable playback.');
-            });
+            // Only use play()'s promise for user-visible errors. A separate "error" event often fires
+            // transiently (or when swapping clips) even when playback succeeds — that caused false alerts.
             a.play().catch(function (err) {
                 if (err && err.name === 'NotAllowedError') {
-                    alertOnce('Tap Play again — the browser required a click or tap on this page first.');
-                } else if (!alerted) {
-                    alertOnce(
+                    window.alert('Tap Play again — the browser required a click or tap on this page first.');
+                } else {
+                    window.alert(
                         'Playback failed. If this is OGG or an uncommon format, try MP3 or WAV in this viewer.');
                 }
             });
