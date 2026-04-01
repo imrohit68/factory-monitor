@@ -3,13 +3,13 @@
   Builds ONE self-contained Windows installer .exe you can share as-is.
 
   At compile time, NSIS embeds the full jpackage app (JAR + bundled JRE + launcher)
-  inside the installer binary. End users only download/run that single file — no
+  inside the installer binary. End users only download/run that single file - no
   separate zip, stage folder, or extra downloads.
 
   Prerequisites (local Windows only): JDK 17+ (jpackage), Maven, NSIS 3+ (makensis).
 
   Building on Mac (M1/M2): Oracle jpackage cannot create Windows installers on macOS.
-  Use GitHub Actions instead: push the repo, open Actions → "Windows installer" → Run workflow,
+  Use GitHub Actions instead: push the repo, open Actions, run "Windows installer" workflow,
   then download the artifact (one .exe). See .github/workflows/windows-installer.yml
 
   Usage (from repo root, on Windows):
@@ -71,10 +71,10 @@ if (Test-Path -LiteralPath $IconIco) {
     Write-Host "==> Using application icon: $IconIco"
     $JpkgArgs += @('--icon', $IconIco)
 } else {
-    Write-Warning "No app-icon.ico at $IconIco — exe will use default Java icon. See installer/windows/README.txt"
+    Write-Warning "No app-icon.ico at $IconIco - exe will use default Java icon. See installer/windows/README.txt"
 }
 
-# Do not add --win-console here — the desktop launcher should not show a console window.
+# Do not add --win-console here - the desktop launcher should not show a console window.
 & jpackage @JpkgArgs
 
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
