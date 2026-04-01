@@ -31,7 +31,7 @@ public final class InstanceActivationServer {
     public InstanceActivationServer(int port, Stage stage) throws IOException {
         this.stage = stage;
         this.serverSocket = new ServerSocket(port, 50, InetAddress.getLoopbackAddress());
-        this.thread = new Thread(this::acceptLoop, "factory-monitor-activation");
+        this.thread = new Thread(this::acceptLoop, "pcs-activation");
         this.thread.setDaemon(true);
     }
 

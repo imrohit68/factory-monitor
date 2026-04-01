@@ -8,7 +8,8 @@
 </head>
 <body>
 <div class="uc-shell">
-    <header class="uc-header uc-header--minimal">
+    <header class="uc-header">
+        <th:block th:replace="~{fragments/company-brand :: ucBrand}"/>
         <nav class="uc-nav">
             <a class="btn-outline" th:href="@{/}">Dashboard</a>
         </nav>

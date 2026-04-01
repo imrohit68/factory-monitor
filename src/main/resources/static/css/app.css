@@ -208,6 +208,11 @@ a:hover {
     font-size: 0.82rem;
     color: var(--muted);
     max-width: 42rem;
+    line-height: 1.4;
+}
+
+.uc-brand .addr .block {
+    display: block;
 }
 
 .uc-nav {

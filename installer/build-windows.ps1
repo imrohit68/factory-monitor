@@ -16,7 +16,7 @@
     .\installer\build-windows.ps1
     .\installer\build-windows.ps1 -CleanStage   # remove installer\stage after success
 
-  Output to distribute:  target\factory-monitor-installer.exe
+  Output to distribute:  target\production-calling-system-installer.exe
 #>
 param(
     [switch] $CleanStage
@@ -27,10 +27,10 @@ $ErrorActionPreference = "Stop"
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $RepoRoot
 
-$JarName = "factory-monitor-0.0.1-SNAPSHOT.jar"
+$JarName = "production-calling-system-0.0.1-SNAPSHOT.jar"
 $JarPath = Join-Path (Join-Path $RepoRoot "target") $JarName
 $StageDir = Join-Path $PSScriptRoot "stage"
-$AppImageDir = Join-Path $StageDir "FactoryMonitor"
+$AppImageDir = Join-Path $StageDir "ProductionCallingSystem"
 
 $Mvnw = Join-Path $RepoRoot "mvnw.cmd"
 if (Test-Path -LiteralPath $Mvnw) {
@@ -59,7 +59,7 @@ New-Item -ItemType Directory -Path $StageDir -Force | Out-Null
 # Do not add --win-console here — the desktop launcher should not show a console window.
 & jpackage `
     --type app-image `
-    --name FactoryMonitor `
+    --name ProductionCallingSystem `
     --input (Join-Path $RepoRoot "target") `
     --main-jar $JarName `
     --main-class org.springframework.boot.loader.launch.JarLauncher `
@@ -69,7 +69,7 @@ New-Item -ItemType Directory -Path $StageDir -Force | Out-Null
 
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-$Exe = Join-Path $AppImageDir "FactoryMonitor.exe"
+$Exe = Join-Path $AppImageDir "ProductionCallingSystem.exe"
 if (-not (Test-Path -LiteralPath $Exe)) {
     Write-Error "jpackage did not produce: $Exe"
 }
@@ -84,7 +84,7 @@ if (-not $makensis) {
 & makensis "/DAPP_SOURCE_DIR=$AppImageDir" (Join-Path $PSScriptRoot "nsis\factory-monitor-installer.nsi")
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-$Out = Join-Path $RepoRoot "target\factory-monitor-installer.exe"
+$Out = Join-Path $RepoRoot "target\production-calling-system-installer.exe"
 Write-Host ""
 Write-Host "================================================================" -ForegroundColor Green
 Write-Host "  SINGLE FILE TO SHARE (nothing else required for end users):" -ForegroundColor Green

@@ -22,12 +22,14 @@
 </head>
 
 <header th:fragment="pageHeader" class="app-nav-bar shrink-0 z-30">
-    <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+    <div class="max-w-7xl mx-auto px-6 min-h-20 py-3 flex items-center justify-between gap-4">
         <div class="flex items-center gap-4 min-w-0">
             <img th:src="@{/images/app-logo.svg}" alt="App Logo" class="w-14 h-14 shrink-0"/>
-            <div class="flex flex-col justify-center min-w-0">
-                <h1 class="text-xl font-medium tracking-tight leading-tight text-slate-900 truncate">Unicharm India Pvt. Ltd.</h1>
-                <p class="text-sm font-normal text-slate-500 mt-0.5 truncate">Sri City Central Expressway, Sector 24</p>
+            <div class="flex flex-col justify-center min-w-0 max-w-xl lg:max-w-2xl">
+                <h1 class="text-xl font-medium tracking-tight leading-tight text-slate-900">Unicharm India Pvt. Ltd.</h1>
+                <div class="text-sm font-normal text-slate-500 mt-0.5 leading-snug">
+                    <th:block th:replace="~{fragments/company-brand :: addressLines}"/>
+                </div>
             </div>
         </div>
         <a th:href="@{/}" class="uc-motion text-base font-normal text-gray-500 hover:text-gray-900 flex items-center gap-2 shrink-0">

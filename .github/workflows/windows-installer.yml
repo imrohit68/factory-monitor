@@ -1,4 +1,4 @@
-# Build the self-contained factory-monitor-installer.exe on Windows (required by jpackage).
+# Build the self-contained production-calling-system-installer.exe on Windows (required by jpackage).
 # Run from your Mac: push this repo to GitHub → Actions → "Windows installer" → Run workflow
 # → download the artifact (single .exe).
 
@@ -39,5 +39,5 @@ jobs:
       - name: Upload installer (single file to share)
         uses: actions/upload-artifact@v4
         with:
-          name: factory-monitor-installer
-          path: target/factory-monitor-installer.exe
+          name: production-calling-system-installer
+          path: target/production-calling-system-installer.exe

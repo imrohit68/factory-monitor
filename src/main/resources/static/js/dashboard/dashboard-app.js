@@ -27,6 +27,15 @@
     };
 
     const { createApp } = Vue;
+
+    // Back-forward cache: Chrome/WebView can restore this page without re-running scripts.
+    // Vue then never mounts again → raw "{{ ... }}" in the DOM. Force a real reload.
+    window.addEventListener('pageshow', function (e) {
+        if (e.persisted) {
+            window.location.reload();
+        }
+    });
+
     createApp({
         data() {
             return {
@@ -92,6 +101,8 @@
                     this.stopAlertAudio();
                 } else {
                     console.log('Page visible event, syncing audio');
+                    // Background tabs throttle timers; refresh immediately when user returns.
+                    this.refresh();
                     this.syncAlertAudioPlaylist(this.workstations);
                 }
             };

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Sign in — Factory monitor</title>
+    <title>Sign in — Production Calling System</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com"/>
@@ -21,9 +21,11 @@
     <header class="app-nav-bar px-4 sm:px-6 py-4 flex items-center justify-between shrink-0 relative z-20">
         <div class="flex items-center gap-4 sm:gap-5 min-w-0">
             <img th:src="@{/images/app-logo.svg}" alt="App Logo" class="w-11 h-11 sm:w-12 sm:h-12 shrink-0"/>
-            <div class="flex flex-col justify-center min-w-0">
-                <h1 class="text-lg sm:text-xl font-normal tracking-tight text-gray-900 leading-tight truncate">Unicharm India Pvt. Ltd.</h1>
-                <p class="text-xs sm:text-sm text-gray-500 mt-0.5 truncate">Sri City Central Expressway, Sector 24</p>
+            <div class="flex flex-col justify-center min-w-0 max-w-xl lg:max-w-2xl">
+                <h1 class="text-lg sm:text-xl font-normal tracking-tight text-gray-900 leading-tight">Unicharm India Pvt. Ltd.</h1>
+                <div class="text-xs sm:text-sm text-gray-500 mt-0.5 leading-snug">
+                    <th:block th:replace="~{fragments/company-brand :: addressLines}"/>
+                </div>
             </div>
         </div>
         <a th:href="@{/}" class="uc-motion text-sm sm:text-base font-normal text-gray-500 hover:text-gray-900 flex items-center gap-2 shrink-0">

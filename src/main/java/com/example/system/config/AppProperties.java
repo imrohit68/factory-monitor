@@ -61,7 +61,7 @@ public class AppProperties {
      * Back up this directory to recover both DB and audio; DB references URLs like {@code /audio/uploads/...}
      * which map to files under {@link #getAudioUploadDir()}.
      */
-    private String dataDir = Paths.get(System.getProperty("user.home"), "factory-monitor-data").toString();
+    private String dataDir = Paths.get(System.getProperty("user.home"), "production-calling-system-data").toString();
 
     /**
      * Optional override for uploaded workstation audio (served under /audio/uploads/). If blank,

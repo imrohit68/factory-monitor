@@ -18,7 +18,7 @@ public class DataDirectoryInitializer implements ApplicationContextInitializer<C
         ConfigurableEnvironment env = applicationContext.getEnvironment();
         String dataDir = env.getProperty("system.data-dir");
         if (dataDir == null || dataDir.isBlank()) {
-            dataDir = Path.of(System.getProperty("user.home"), "factory-monitor-data").toString();
+            dataDir = Path.of(System.getProperty("user.home"), "production-calling-system-data").toString();
         }
         String audioDir = env.getProperty("system.audio-upload-dir");
         if (audioDir == null || audioDir.isBlank()) {

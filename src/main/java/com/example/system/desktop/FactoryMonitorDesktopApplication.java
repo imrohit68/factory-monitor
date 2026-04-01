@@ -115,7 +115,7 @@ public class FactoryMonitorDesktopApplication extends Application {
         } catch (IOException e) {
             log.debug("Could not load application.properties for title: {}", e.getMessage());
         }
-        String name = p.getProperty("spring.application.name", "factory-monitor");
+        String name = p.getProperty("spring.application.name", "production-calling-system");
         return humanizeAppName(name);
     }
 
@@ -129,10 +129,23 @@ public class FactoryMonitorDesktopApplication extends Application {
 
     static String humanizeAppName(String raw) {
         if (raw == null || raw.isBlank()) {
-            return "Factory Monitor";
+            return "Production Calling System";
         }
         String s = raw.trim().replace('-', ' ');
-        return Character.toUpperCase(s.charAt(0)) + s.substring(1);
+        StringBuilder out = new StringBuilder();
+        for (String part : s.split("\\s+")) {
+            if (part.isEmpty()) {
+                continue;
+            }
+            if (out.length() > 0) {
+                out.append(' ');
+            }
+            out.append(Character.toUpperCase(part.charAt(0)));
+            if (part.length() > 1) {
+                out.append(part.substring(1).toLowerCase());
+            }
+        }
+        return out.length() > 0 ? out.toString() : "Production Calling System";
     }
 
     private static boolean waitForLocalPort(int port, long timeoutMs) {
@@ -172,7 +185,7 @@ public class FactoryMonitorDesktopApplication extends Application {
 
     private static void showError(String message) {
         Alert alert = new Alert(Alert.AlertType.ERROR);
-        alert.setTitle("Factory Monitor");
+        alert.setTitle("Production Calling System");
         alert.setHeaderText("Startup error");
         alert.setContentText(message != null ? message : "Unknown error");
         alert.showAndWait();

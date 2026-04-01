@@ -9,10 +9,10 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>com.example</groupId>
-    <artifactId>factory-monitor</artifactId>
+    <artifactId>production-calling-system</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>factory-monitor</name>
-    <description>Factory workstation monitor (dashboard, Modbus, event log)</description>
+    <name>Production Calling System</name>
+    <description>Production calling system — workstation dashboard, Modbus, event log</description>
     <url/>
     <licenses>
         <license/>

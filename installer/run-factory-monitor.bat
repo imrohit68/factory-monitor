@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableExtensions
 REM ============================================================================
-REM Factory Monitor — Windows launcher (place next to the Spring Boot JAR)
+REM Production Calling System — Windows launcher (place next to the Spring Boot JAR)
 REM Requires: Java 17+ (set JAVA_HOME or ensure java.exe is on PATH)
 REM Edit the CONFIG section below, then double-click or run: run-factory-monitor.bat
 REM ============================================================================
@@ -10,7 +10,7 @@ set "SCRIPT_DIR=%~dp0"
 cd /d "%SCRIPT_DIR%"
 
 REM --- JAR (override with set FACTORY_MONITOR_JAR=... before running) ------------
-if not defined FACTORY_MONITOR_JAR set "FACTORY_MONITOR_JAR=factory-monitor-0.0.1-SNAPSHOT.jar"
+if not defined FACTORY_MONITOR_JAR set "FACTORY_MONITOR_JAR=production-calling-system-0.0.1-SNAPSHOT.jar"
 set "JAR_PATH=%SCRIPT_DIR%%FACTORY_MONITOR_JAR%"
 if not exist "%JAR_PATH%" (
   echo ERROR: JAR not found: "%JAR_PATH%"
@@ -45,7 +45,7 @@ set "SYSTEM_SECURITY_INITIAL_USERNAME=admin"
 set "SYSTEM_SECURITY_INITIAL_PASSWORD=admin@123"
 
 REM Data: SQLite DB and alert audio live under this folder (use a fixed path on servers)
-set "SYSTEM_DATA_DIR=%USERPROFILE%\factory-monitor-data"
+set "SYSTEM_DATA_DIR=%USERPROFILE%\production-calling-system-data"
 
 REM Optional: separate folder for uploaded workstation audio (leave empty to use DATA_DIR\alert-audio)
 set "SYSTEM_AUDIO_UPLOAD_DIR="

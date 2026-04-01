@@ -34,5 +34,5 @@ build/
 ### VS Code ###
 .vscode/
 
-# Legacy embedded DB under repo (runtime uses system.data-dir / factory-monitor.sqlite)
+# Legacy embedded DB under repo (runtime uses system.data-dir / production-calling-system.sqlite)
 data/

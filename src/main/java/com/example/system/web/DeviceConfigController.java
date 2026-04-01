@@ -90,7 +90,7 @@ public class DeviceConfigController {
             Properties p = new Properties();
             p.setProperty("system.modbus.port-name", portName);
             try (OutputStream out = Files.newOutputStream(file)) {
-                p.store(out, "Factory Monitor — saved serial port (do not edit unless the app is stopped)");
+                p.store(out, "Production Calling System — saved serial port (do not edit unless the app is stopped)");
             }
         } catch (Exception e) {
             log.warn("Could not persist serial port: {}", e.getMessage());

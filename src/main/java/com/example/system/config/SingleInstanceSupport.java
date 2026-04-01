@@ -80,7 +80,7 @@ public final class SingleInstanceSupport {
             return;
         }
         String dataDir = resolveDataDir(defaults, args);
-        Path lockPath = Paths.get(dataDir, "factory-monitor.lock");
+        Path lockPath = Paths.get(dataDir, "production-calling-system.lock");
         try {
             Files.createDirectories(lockPath.getParent());
             RandomAccessFile raf = new RandomAccessFile(lockPath.toFile(), "rw");
@@ -221,7 +221,7 @@ public final class SingleInstanceSupport {
                 System.getProperty("system.data-dir"),
                 defaults.getProperty("system.data-dir"));
         if (v == null || v.isBlank()) {
-            v = Paths.get(System.getProperty("user.home"), "factory-monitor-data").toString();
+            v = Paths.get(System.getProperty("user.home"), "production-calling-system-data").toString();
         } else {
             v = expandPlaceholders(v.trim());
         }

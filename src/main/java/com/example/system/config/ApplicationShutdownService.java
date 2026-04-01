@@ -18,7 +18,7 @@ public class ApplicationShutdownService {
 
     /** Returns immediately; shutdown runs on a short delay so the HTTP response can complete. */
     public void shutdownGracefully() {
-        Thread t = new Thread(this::exitAfterDelay, "factory-monitor-shutdown");
+        Thread t = new Thread(this::exitAfterDelay, "pcs-shutdown");
         t.setDaemon(false);
         t.start();
     }

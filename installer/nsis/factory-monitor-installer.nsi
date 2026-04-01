@@ -1,21 +1,21 @@
-; Factory Monitor - Windows installer (NSIS 3+, Unicode)
+; Production Calling System - Windows installer (NSIS 3+, Unicode)
 ;
-; Data is always stored under:  %USERPROFILE%\factory-monitor-data
-; If factory-monitor.sqlite exists there, the user is asked to recover or wipe.
+; Data is always stored under:  %USERPROFILE%\production-calling-system-data
+; If production-calling-system.sqlite exists there, the user is asked to recover or wipe.
 ; Recover: existing DB and logins are kept. Initial username/password are not written to config.
 ; Wipe: that folder is removed during install, then normal flow (new admin credentials on the config page).
 
 !ifndef APP_SOURCE_DIR
-  !define APP_SOURCE_DIR "stage\FactoryMonitor"
+  !define APP_SOURCE_DIR "stage\ProductionCallingSystem"
 !endif
 
 Unicode true
 SetCompressor /SOLID lzma
 RequestExecutionLevel admin
-Name "Factory Monitor"
-OutFile "..\..\target\factory-monitor-installer.exe"
-InstallDir "$PROGRAMFILES64\Factory Monitor"
-InstallDirRegKey HKLM "Software\FactoryMonitor" "InstallDir"
+Name "Production Calling System"
+OutFile "..\..\target\production-calling-system-installer.exe"
+InstallDir "$PROGRAMFILES64\Production Calling System"
+InstallDirRegKey HKLM "Software\ProductionCallingSystem" "InstallDir"
 
 !include "MUI2.nsh"
 !include "nsDialogs.nsh"
@@ -32,8 +32,8 @@ ${StrRep}
 !define MUI_ICON "${NSISDIR}\Contrib\Graphics\Icons\modern-install.ico"
 !define MUI_UNICON "${NSISDIR}\Contrib\Graphics\Icons\modern-uninstall.ico"
 
-!define MUI_WELCOMEPAGE_TITLE "Welcome to Factory Monitor Setup"
-!define MUI_WELCOMEPAGE_TEXT "This wizard installs Factory Monitor: workstation dashboard, Modbus, and event log.$\r$\n$\r$\nYour data folder is always:$\r$\n%USERPROFILE%\factory-monitor-data$\r$\n$\r$\nIf that folder already has a database, you can keep it or start over.$\r$\n$\r$\nClick Next to continue."
+!define MUI_WELCOMEPAGE_TITLE "Welcome to Production Calling System Setup"
+!define MUI_WELCOMEPAGE_TEXT "This wizard installs Production Calling System: workstation dashboard, Modbus, and event log.$\r$\n$\r$\nYour data folder is always:$\r$\n%USERPROFILE%\production-calling-system-data$\r$\n$\r$\nIf that folder already has a database, you can keep it or start over.$\r$\n$\r$\nClick Next to continue."
 
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_DIRECTORY
@@ -42,8 +42,8 @@ Page custom PageAlert PageAlertLeave
 Page custom PageModbus PageModbusLeave
 Page custom PagePorts PagePortsLeave
 !insertmacro MUI_PAGE_INSTFILES
-!define MUI_FINISHPAGE_RUN "$INSTDIR\FactoryMonitor.exe"
-!define MUI_FINISHPAGE_RUN_TEXT "Launch Factory Monitor"
+!define MUI_FINISHPAGE_RUN "$INSTDIR\ProductionCallingSystem.exe"
+!define MUI_FINISHPAGE_RUN_TEXT "Launch Production Calling System"
 !define MUI_FINISHPAGE_SHOWREADME "$INSTDIR\install.log"
 !define MUI_FINISHPAGE_SHOWREADME_TEXT "Open data directory in Explorer"
 !define MUI_FINISHPAGE_SHOWREADME_NOTCHECKED
@@ -89,7 +89,7 @@ Function finishOpenDataDir
 FunctionEnd
 
 Function .onInit
-  StrCpy $DataDir "$PROFILE\factory-monitor-data"
+  StrCpy $DataDir "$PROFILE\production-calling-system-data"
   StrCpy $RecoverMode "0"
   StrCpy $InitialUser "admin"
   StrCpy $InitialPass "admin@123"
@@ -121,7 +121,7 @@ FunctionEnd
 
 ; Silent: if SQLite exists at fixed path, recover (no credential lines in config). Else fresh defaults.
 Function SilentFixedPathDefaults
-  IfFileExists "$PROFILE\factory-monitor-data\factory-monitor.sqlite" 0 silent_fresh
+  IfFileExists "$PROFILE\production-calling-system-data\production-calling-system.sqlite" 0 silent_fresh
     StrCpy $UseExistingDataLock "1"
     StrCpy $DeleteRecoveryOnInstall "0"
     StrCpy $RecoverMode "1"
@@ -135,13 +135,13 @@ FunctionEnd
 Function PageConfig
   !insertmacro MUI_HEADER_TEXT "Account" "Data folder is fixed under your profile. Set the admin login (next screen: dashboard alert timing)."
 
-  StrCpy $DataDir "$PROFILE\factory-monitor-data"
+  StrCpy $DataDir "$PROFILE\production-calling-system-data"
 
   ${IfNot} ${Silent}
     ${If} $RecoveryPromptDone != "1"
       StrCpy $RecoveryPromptDone "1"
-      IfFileExists "$DataDir\factory-monitor.sqlite" 0 prompt_done
-        MessageBox MB_YESNO|MB_ICONQUESTION "Existing Factory Monitor data was found at:$\r$\n$DataDir$\r$\n$\r$\nYes: Keep your database and logins. You will not set a new admin password.$\r$\n$\r$\nNo: Delete that folder and create a new database. You will set a new admin user and password next." IDYES recover_yes
+      IfFileExists "$DataDir\production-calling-system.sqlite" 0 prompt_done
+        MessageBox MB_YESNO|MB_ICONQUESTION "Existing Production Calling System data was found at:$\r$\n$DataDir$\r$\n$\r$\nYes: Keep your database and logins. You will not set a new admin password.$\r$\n$\r$\nNo: Delete that folder and create a new database. You will set a new admin user and password next." IDYES recover_yes
         StrCpy $UseExistingDataLock "0"
         StrCpy $DeleteRecoveryOnInstall "1"
         StrCpy $RecoverMode "0"
@@ -242,7 +242,7 @@ Function PageConfigLeave
     ${EndIf}
   ${EndIf}
 
-  StrCpy $DataDir "$PROFILE\factory-monitor-data"
+  StrCpy $DataDir "$PROFILE\production-calling-system-data"
 
   ${If} $UseExistingDataLock != "1"
     ${If} $InitialUser == ""
@@ -416,7 +416,7 @@ Function WriteAppConfig
   ${StrRep} $R9 $DataDir "\" "/"
   CreateDirectory "$INSTDIR\config"
   FileOpen $0 "$INSTDIR\config\application.properties" w
-  FileWrite $0 "# Generated by Factory Monitor installer$\r$\n"
+  FileWrite $0 "# Generated by Production Calling System installer$\r$\n"
   FileWrite $0 "system.data-dir=$R9$\r$\n"
   FileWrite $0 "logging.pattern.console=$\r$\n"
   ${If} $UseExistingDataLock != "1"
@@ -447,10 +447,10 @@ FunctionEnd
 Section "Application" SecApp
   SetOutPath "$INSTDIR"
   FileOpen $LogFile "$INSTDIR\install.log" w
-  FileWrite $LogFile "Factory Monitor installer log$\r$\n"
+  FileWrite $LogFile "Production Calling System installer log$\r$\n"
   FileClose $LogFile
 
-  StrCpy $DataDir "$PROFILE\factory-monitor-data"
+  StrCpy $DataDir "$PROFILE\production-calling-system-data"
   ${If} $DeleteRecoveryOnInstall == "1"
     RMDir /r "$DataDir"
   ${EndIf}
@@ -460,37 +460,37 @@ Section "Application" SecApp
   Call WriteAppConfig
 
   SetOutPath "$INSTDIR"
-  WriteRegStr HKLM "Software\FactoryMonitor" "InstallDir" "$INSTDIR"
-  WriteRegStr HKLM "Software\FactoryMonitor" "DataDir" "$DataDir"
+  WriteRegStr HKLM "Software\ProductionCallingSystem" "InstallDir" "$INSTDIR"
+  WriteRegStr HKLM "Software\ProductionCallingSystem" "DataDir" "$DataDir"
 
   Call WriteInstallLog
 
   WriteUninstaller "$INSTDIR\Uninstall.exe"
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\FactoryMonitor" "DisplayName" "Factory Monitor"
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\FactoryMonitor" "DisplayVersion" "${PRODUCT_VERSION}"
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\FactoryMonitor" "Publisher" "Factory Monitor"
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\FactoryMonitor" "UninstallString" "$INSTDIR\Uninstall.exe"
-  WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\FactoryMonitor" "NoModify" 1
-  WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\FactoryMonitor" "NoRepair" 1
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ProductionCallingSystem" "DisplayName" "Production Calling System"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ProductionCallingSystem" "DisplayVersion" "${PRODUCT_VERSION}"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ProductionCallingSystem" "Publisher" "Production Calling System"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ProductionCallingSystem" "UninstallString" "$INSTDIR\Uninstall.exe"
+  WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ProductionCallingSystem" "NoModify" 1
+  WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ProductionCallingSystem" "NoRepair" 1
 SectionEnd
 
 Section "Shortcuts" SecShortcuts
-  CreateDirectory "$SMPROGRAMS\Factory Monitor"
-  CreateShortCut "$SMPROGRAMS\Factory Monitor\Factory Monitor.lnk" "$INSTDIR\FactoryMonitor.exe" "" "$INSTDIR" 0 SW_SHOWNORMAL "" "Factory Monitor"
-  CreateShortCut "$SMPROGRAMS\Factory Monitor\Uninstall Factory Monitor.lnk" "$INSTDIR\Uninstall.exe" "" "$INSTDIR" 0
-  CreateShortCut "$DESKTOP\Factory Monitor.lnk" "$INSTDIR\FactoryMonitor.exe" "" "$INSTDIR" 0 SW_SHOWNORMAL "" "Factory Monitor"
+  CreateDirectory "$SMPROGRAMS\Production Calling System"
+  CreateShortCut "$SMPROGRAMS\Production Calling System\Production Calling System.lnk" "$INSTDIR\ProductionCallingSystem.exe" "" "$INSTDIR" 0 SW_SHOWNORMAL "" "Production Calling System"
+  CreateShortCut "$SMPROGRAMS\Production Calling System\Uninstall Production Calling System.lnk" "$INSTDIR\Uninstall.exe" "" "$INSTDIR" 0
+  CreateShortCut "$DESKTOP\Production Calling System.lnk" "$INSTDIR\ProductionCallingSystem.exe" "" "$INSTDIR" 0 SW_SHOWNORMAL "" "Production Calling System"
 SectionEnd
 
 Section Uninstall
   Delete "$INSTDIR\install.log"
   Delete "$INSTDIR\Uninstall.exe"
   RMDir /r "$INSTDIR"
-  Delete "$SMPROGRAMS\Factory Monitor\Factory Monitor.lnk"
-  Delete "$SMPROGRAMS\Factory Monitor\Uninstall Factory Monitor.lnk"
-  RMDir "$SMPROGRAMS\Factory Monitor"
-  Delete "$DESKTOP\Factory Monitor.lnk"
-  DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\FactoryMonitor"
-  DeleteRegKey HKLM "Software\FactoryMonitor"
+  Delete "$SMPROGRAMS\Production Calling System\Production Calling System.lnk"
+  Delete "$SMPROGRAMS\Production Calling System\Uninstall Production Calling System.lnk"
+  RMDir "$SMPROGRAMS\Production Calling System"
+  Delete "$DESKTOP\Production Calling System.lnk"
+  DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ProductionCallingSystem"
+  DeleteRegKey HKLM "Software\ProductionCallingSystem"
 SectionEnd
 
 !insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
@@ -499,6 +499,6 @@ SectionEnd
 !insertmacro MUI_FUNCTION_DESCRIPTION_END
 
 Function un.onInit
-  MessageBox MB_YESNO|MB_ICONQUESTION "Remove Factory Monitor from this computer?" IDYES +2
+  MessageBox MB_YESNO|MB_ICONQUESTION "Remove Production Calling System from this computer?" IDYES +2
   Abort
 FunctionEnd
