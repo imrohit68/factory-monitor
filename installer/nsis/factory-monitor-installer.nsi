@@ -29,8 +29,9 @@ ${StrRep}
 
 !define PRODUCT_VERSION "0.0.1"
 !define MUI_ABORTWARNING
-!define MUI_ICON "${NSISDIR}\Contrib\Graphics\Icons\modern-install.ico"
-!define MUI_UNICON "${NSISDIR}\Contrib\Graphics\Icons\modern-uninstall.ico"
+; App branding (same as jpackage --icon); path is relative to this .nsi file (installer\nsis\)
+!define MUI_ICON "..\windows\app-icon.ico"
+!define MUI_UNICON "..\windows\app-icon.ico"
 
 !define MUI_WELCOMEPAGE_TITLE "Welcome to Production Calling System Setup"
 !define MUI_WELCOMEPAGE_TEXT "This wizard installs Production Calling System: workstation dashboard, Modbus, and event log.$\r$\n$\r$\nYour data folder is always:$\r$\n%USERPROFILE%\production-calling-system-data$\r$\n$\r$\nIf that folder already has a database, you can keep it or start over.$\r$\n$\r$\nClick Next to continue."

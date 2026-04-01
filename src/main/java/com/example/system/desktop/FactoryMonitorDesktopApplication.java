@@ -6,6 +6,7 @@ import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
+import javafx.scene.image.Image;
 import javafx.scene.layout.StackPane;
 import javafx.scene.web.WebView;
 import javafx.stage.Stage;
@@ -14,6 +15,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.SpringApplication;
 import org.springframework.context.ConfigurableApplicationContext;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
@@ -37,6 +39,7 @@ public class FactoryMonitorDesktopApplication extends Application {
         int activationPort = SingleInstanceSupport.getActivationPort();
 
         stage.setTitle(resolveWindowTitle());
+        applyStageIcon(stage);
         WebView webView = new WebView();
         webView.getEngine().loadContent(wrapHtml("Starting…"));
         stage.setScene(new Scene(new StackPane(webView), 1280, 800));
@@ -117,6 +120,20 @@ public class FactoryMonitorDesktopApplication extends Application {
         }
         String name = p.getProperty("spring.application.name", "production-calling-system");
         return humanizeAppName(name);
+    }
+
+    private static void applyStageIcon(Stage stage) {
+        try (InputStream in =
+                FactoryMonitorDesktopApplication.class
+                        .getClassLoader()
+                        .getResourceAsStream("static/images/app-logo.png")) {
+            if (in != null) {
+                byte[] png = in.readAllBytes();
+                stage.getIcons().add(new Image(new ByteArrayInputStream(png)));
+            }
+        } catch (IOException e) {
+            log.debug("Could not load window icon: {}", e.getMessage());
+        }
     }
 
     private static void applyDesktopFullscreen(Stage stage) {

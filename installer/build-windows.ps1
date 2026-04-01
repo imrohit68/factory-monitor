@@ -56,16 +56,26 @@ if (Test-Path -LiteralPath $AppImageDir) {
 }
 New-Item -ItemType Directory -Path $StageDir -Force | Out-Null
 
+$IconIco = Join-Path $PSScriptRoot "windows\app-icon.ico"
+$JpkgArgs = @(
+    '--type', 'app-image',
+    '--name', 'ProductionCallingSystem',
+    '--input', (Join-Path $RepoRoot "target"),
+    '--main-jar', $JarName,
+    '--main-class', 'org.springframework.boot.loader.launch.JarLauncher',
+    '--dest', $StageDir,
+    '--java-options', '-Dfile.encoding=UTF-8',
+    '--app-version', '0.0.1'
+)
+if (Test-Path -LiteralPath $IconIco) {
+    Write-Host "==> Using application icon: $IconIco"
+    $JpkgArgs += @('--icon', $IconIco)
+} else {
+    Write-Warning "No app-icon.ico at $IconIco — exe will use default Java icon. See installer/windows/README.txt"
+}
+
 # Do not add --win-console here — the desktop launcher should not show a console window.
-& jpackage `
-    --type app-image `
-    --name ProductionCallingSystem `
-    --input (Join-Path $RepoRoot "target") `
-    --main-jar $JarName `
-    --main-class org.springframework.boot.loader.launch.JarLauncher `
-    --dest $StageDir `
-    --java-options "-Dfile.encoding=UTF-8" `
-    --app-version "0.0.1"
+& jpackage @JpkgArgs
 
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
