@@ -57,6 +57,7 @@ if (Test-Path -LiteralPath $AppImageDir) {
 New-Item -ItemType Directory -Path $StageDir -Force | Out-Null
 
 $IconIco = Join-Path $PSScriptRoot "windows\app-icon.ico"
+# Packaged .exe: browser UI + heartbeat shutdown (same defaults as application.properties; -D overrides jar).
 $JpkgArgs = @(
     '--type', 'app-image',
     '--name', 'ProductionCallingSystem',
@@ -65,6 +66,9 @@ $JpkgArgs = @(
     '--main-class', 'org.springframework.boot.loader.launch.JarLauncher',
     '--dest', $StageDir,
     '--java-options', '-Dfile.encoding=UTF-8',
+    '--java-options', '-Dsystem.desktop-mode=false',
+    '--java-options', '-Dsystem.launch-browser=true',
+    '--java-options', '-Dsystem.exit-on-browser-close=true',
     '--app-version', '0.0.1'
 )
 if (Test-Path -LiteralPath $IconIco) {
@@ -74,7 +78,7 @@ if (Test-Path -LiteralPath $IconIco) {
     Write-Warning "No app-icon.ico at $IconIco - exe will use default Java icon. See installer/windows/README.txt"
 }
 
-# Do not add --win-console here - the desktop launcher should not show a console window.
+# Do not add --win-console here - the launcher should not show a console window.
 & jpackage @JpkgArgs
 
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -93,7 +97,7 @@ if (Test-Path -LiteralPath $IconIco) {
 }
 if (Test-Path -LiteralPath $LogoPng) {
     Copy-Item -LiteralPath $LogoPng -Destination (Join-Path $AppImageDir "app-logo.png") -Force
-    Write-Host "==> Copied app-logo.png into app image (JavaFX window icon)"
+    Write-Host "==> Copied app-logo.png into app image (optional branding beside launcher)"
 }
 
 Write-Host "==> NSIS (makensis)"

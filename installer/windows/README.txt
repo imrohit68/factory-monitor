@@ -3,8 +3,8 @@ app-icon.ico
 Windows jpackage and NSIS use this file for the installed .exe and setup wizard icon.
 
 The build script also copies app-icon.ico and app-logo.png into the jpackage app folder so:
-- Start Menu / Desktop shortcuts can use app-icon.ico (JavaFX does not load .ico for Stage icons)
-- The running app loads app-logo.png from the install directory for the window/taskbar image
+- Start Menu / Desktop shortcuts can use app-icon.ico
+- app-logo.png remains beside the launcher for branding (default run mode opens the system browser, not JavaFX)
 
 It was generated from src/main/resources/static/images/app-logo.png (padded to a square
 with macOS `sips`, then converted with png-to-ico). To regenerate after changing the logo:

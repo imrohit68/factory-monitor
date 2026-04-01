@@ -1,0 +1,53 @@
+package com.example.system.config;
+
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
+import java.io.IOException;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+/**
+ * Ends the HTTP session whenever the dashboard ({@code GET /}) is opened. Operators use Login when
+ * entering admin; leaving admin via “Return to Dashboard” should not keep an authenticated session
+ * on the floor display.
+ */
+@Component
+public class DashboardSessionInvalidateFilter extends OncePerRequestFilter {
+
+    @Override
+    protected void doFilterInternal(
+            HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+            throws ServletException, IOException {
+        if (isDashboardRootGet(request)) {
+            HttpSession session = request.getSession(false);
+            if (session != null) {
+                session.invalidate();
+            }
+            SecurityContextHolder.clearContext();
+        }
+        filterChain.doFilter(request, response);
+    }
+
+    private static boolean isDashboardRootGet(HttpServletRequest request) {
+        if (!"GET".equalsIgnoreCase(request.getMethod())) {
+            return false;
+        }
+        String ctx = request.getContextPath();
+        if (ctx == null) {
+            ctx = "";
+        }
+        String uri = request.getRequestURI();
+        if (uri == null) {
+            return false;
+        }
+        int semi = uri.indexOf(';');
+        if (semi >= 0) {
+            uri = uri.substring(0, semi);
+        }
+        return uri.equals(ctx + "/") || uri.equals(ctx);
+    }
+}

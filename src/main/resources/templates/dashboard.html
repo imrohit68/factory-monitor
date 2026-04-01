@@ -21,6 +21,25 @@
             window.addEventListener('pageshow', reloadIfRestored);
         })();
     </script>
+    <script>
+        /* Browsers that open via default handler (e.g. Firefox) may not be fullscreen; first tap requests it. */
+        (function () {
+            var tried = false;
+            function tryFullscreen() {
+                if (tried || document.fullscreenElement || document.hidden) return;
+                var el = document.documentElement;
+                if (!el.requestFullscreen) return;
+                tried = true;
+                var p = el.requestFullscreen();
+                if (p && typeof p.then === 'function') {
+                    p.catch(function () {
+                        tried = false;
+                    });
+                }
+            }
+            document.addEventListener('pointerdown', tryFullscreen, { capture: true, passive: true });
+        })();
+    </script>
     <script th:src="@{/vendor/tailwindcss-standalone.js}"></script>
     <script th:src="@{/vendor/iconify-icon.min.js}"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com"/>
@@ -103,25 +122,10 @@
                         <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
                     </svg>
                 </button>
-                <th:block th:if="${dashboardSignedIn}">
-                    <div class="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
-                        <span class="text-xs sm:text-sm text-gray-500 max-w-[8rem] sm:max-w-none truncate" th:text="${dashboardUsername}" title="Signed-in account">admin</span>
-                        <form th:action="@{/logout}" method="post" class="inline-flex">
-                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                            <button type="submit"
-                                    class="uc-motion flex items-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-lg border border-gray-300 bg-white text-gray-800 hover:bg-gray-50 active:scale-[0.98] shadow-sm text-sm sm:text-base font-semibold">
-                                <iconify-icon icon="solar:logout-2-linear" class="text-lg sm:text-xl" stroke-width="1.5"></iconify-icon>
-                                <span class="hidden sm:inline">Sign out</span>
-                            </button>
-                        </form>
-                    </div>
-                </th:block>
-                <th:block th:unless="${dashboardSignedIn}">
-                    <a th:href="@{/login}" class="uc-motion flex items-center gap-2.5 sm:gap-3 px-5 sm:px-6 py-3 sm:py-3.5 bg-[#111111] text-white rounded-lg hover:bg-black active:scale-[0.98] shadow-sm text-base sm:text-lg font-bold tracking-wide">
-                        <iconify-icon icon="solar:login-2-linear" class="text-xl sm:text-2xl" stroke-width="1.5"></iconify-icon>
-                        <span class="hidden sm:inline">Login</span>
-                    </a>
-                </th:block>
+                <a th:href="@{/login}" class="uc-motion flex items-center gap-2.5 sm:gap-3 px-5 sm:px-6 py-3 sm:py-3.5 bg-[#111111] text-white rounded-lg hover:bg-black active:scale-[0.98] shadow-sm text-base sm:text-lg font-bold tracking-wide">
+                    <iconify-icon icon="solar:login-2-linear" class="text-xl sm:text-2xl" stroke-width="1.5"></iconify-icon>
+                    <span class="hidden sm:inline">Login</span>
+                </a>
             </div>
         </div>
     </header>

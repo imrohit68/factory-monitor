@@ -9,13 +9,18 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 
 @Configuration
 @EnableWebSecurity
+@RequiredArgsConstructor
 public class SecurityConfig {
+
+    private final DashboardSessionInvalidateFilter dashboardSessionInvalidateFilter;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -28,6 +33,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/admin/**", "/report/**").authenticated()
                         .anyRequest().permitAll())
+                .addFilterAfter(dashboardSessionInvalidateFilter, SecurityContextHolderFilter.class)
                 .csrf(csrf -> csrf.ignoringRequestMatchers("/internal/desktop-heartbeat"))
                 .formLogin(form -> form
                         .loginPage("/login")
