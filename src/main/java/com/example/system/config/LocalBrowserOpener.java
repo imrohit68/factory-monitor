@@ -121,7 +121,7 @@ public final class LocalBrowserOpener {
     private static boolean startProcessQuietly(ProcessBuilder pb) {
         pb.redirectError(ProcessBuilder.Redirect.DISCARD);
         pb.redirectOutput(ProcessBuilder.Redirect.DISCARD);
-        pb.redirectInput(ProcessBuilder.Redirect.DISCARD);
+        // Do not use redirectInput(DISCARD): JDK rejects it ("Redirect invalid for reading: WRITE").
         try {
             Process p = pb.start();
             if (!p.waitFor(2, TimeUnit.SECONDS)) {
@@ -137,7 +137,6 @@ public final class LocalBrowserOpener {
     private static void startProcess(ProcessBuilder pb, String label) throws IOException {
         pb.redirectError(ProcessBuilder.Redirect.DISCARD);
         pb.redirectOutput(ProcessBuilder.Redirect.DISCARD);
-        pb.redirectInput(ProcessBuilder.Redirect.DISCARD);
         pb.start();
         log.info("Opened dashboard via {}", label);
     }
