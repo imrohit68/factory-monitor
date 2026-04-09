@@ -56,4 +56,8 @@ public class WorkstationSlot {
     @Column(name = "audio_path", length = 512)
     private String audioPath;
 
+    /** Original client filename for display (not the stored UUID path). */
+    @Column(name = "audio_original_name", length = 255)
+    private String audioOriginalName;
+
 }

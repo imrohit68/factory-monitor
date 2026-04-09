@@ -8,8 +8,13 @@ import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.image.Image;
 import javafx.scene.layout.StackPane;
+import javafx.scene.paint.Color;
+import javafx.scene.paint.CycleMethod;
+import javafx.scene.paint.LinearGradient;
+import javafx.scene.paint.Stop;
 import javafx.scene.web.WebView;
 import javafx.stage.Stage;
+import javafx.stage.StageStyle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.SpringApplication;
@@ -20,13 +25,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Base64;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
 /**
  * Embeds the Spring Boot dashboard in a JavaFX {@link WebView}: dedicated window. Whether closing the window exits
- * the JVM is controlled by {@link SingleInstanceSupport#isDesktopAllowWindowClose()}; when false, use Admin → Shut
- * down application. Single-instance re-launch focuses this window via {@link InstanceActivationServer}.
+ * the JVM is controlled by {@link SingleInstanceSupport#isDesktopAllowWindowClose()}; when false, the stage is
+ * undecorated (no close button) and operators stop the app via Admin → Shut down application. Single-instance
+ * re-launch focuses this window via {@link InstanceActivationServer}.
  */
 public class FactoryMonitorDesktopApplication extends Application {
 
@@ -41,18 +48,23 @@ public class FactoryMonitorDesktopApplication extends Application {
         int httpPort = SingleInstanceSupport.getConfiguredPort();
         int activationPort = SingleInstanceSupport.getActivationPort();
 
-        stage.setTitle(resolveWindowTitle());
+        String windowTitle = resolveWindowTitle();
+        stage.setTitle(windowTitle);
         applyStageIcon(stage);
+        if (!SingleInstanceSupport.isDesktopAllowWindowClose()) {
+            stage.initStyle(StageStyle.UNDECORATED);
+        }
         WebView webView = new WebView();
-        webView.getEngine().loadContent(wrapHtml("Starting…"));
-        stage.setScene(new Scene(new StackPane(webView), 1280, 800));
+        webView.setStyle("-fx-background-color: transparent;");
+        webView.getEngine().loadContent(buildSplashHtml(windowTitle));
+        Scene scene = new Scene(new StackPane(webView), 1280, 800);
+        scene.setFill(splashSceneFill());
+        stage.setScene(scene);
         stage.setOnCloseRequest(
                 e -> {
                     e.consume();
                     if (SingleInstanceSupport.isDesktopAllowWindowClose()) {
                         shutdown(stage);
-                    } else {
-                        showCloseBlockedInfo();
                     }
                 });
         applyDesktopFullscreen(stage);
@@ -98,12 +110,74 @@ public class FactoryMonitorDesktopApplication extends Application {
         waitUi.start();
     }
 
-    private static String wrapHtml(String message) {
-        return "<!DOCTYPE html><html><head><meta charset='utf-8'>"
-                + "<style>body{font-family:system-ui,sans-serif;padding:2rem;background:#f5f5f5;color:#333}</style>"
-                + "</head><body><p>"
-                + escapeHtml(message)
-                + "</p></body></html>";
+    private static LinearGradient splashSceneFill() {
+        return new LinearGradient(
+                0,
+                0,
+                1,
+                1,
+                true,
+                CycleMethod.NO_CYCLE,
+                new Stop(0, Color.web("#0f1419")),
+                new Stop(0.55, Color.web("#1a2744")),
+                new Stop(1, Color.web("#0d2137")));
+    }
+
+    private static String buildSplashHtml(String appTitle) {
+        String logoImg = "";
+        byte[] logoBytes = readClasspathLogoPngBytes();
+        if (logoBytes != null && logoBytes.length > 0) {
+            String b64 = Base64.getEncoder().encodeToString(logoBytes);
+            logoImg =
+                    "<img class=\"logo\" src=\"data:image/png;base64,"
+                            + b64
+                            + "\" alt=\"\" width=\"96\" height=\"96\"/>";
+        }
+        return "<!DOCTYPE html><html><head><meta charset=\"utf-8\"/>"
+                + "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/>"
+                + "<style>"
+                + "*{box-sizing:border-box}"
+                + "html,body{height:100%;margin:0}"
+                + "body{display:flex;flex-direction:column;align-items:center;justify-content:center;"
+                + "font-family:system-ui,-apple-system,\"Segoe UI\",sans-serif;"
+                + "background:linear-gradient(145deg,#0f1419 0%,#1a2744 50%,#0d2137 100%);"
+                + "color:#e8eef7;-webkit-font-smoothing:antialiased}"
+                + ".logo{display:block;width:96px;height:96px;margin:0 0 1.5rem;object-fit:contain;"
+                + "border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.35)}"
+                + "h1{font-size:1.75rem;font-weight:600;letter-spacing:.02em;margin:0 0 .5rem;text-align:center;"
+                + "max-width:90vw;line-height:1.25}"
+                + ".sub{font-size:1rem;color:#8fa3bf;margin:0 0 2rem;text-align:center}"
+                + ".spinner{width:40px;height:40px;border:3px solid rgba(255,255,255,.15);"
+                + "border-top-color:#5b9fd4;border-radius:50%;animation:fxspin .9s linear infinite}"
+                + "@keyframes fxspin{to{transform:rotate(360deg)}}"
+                + "</style></head><body>"
+                + logoImg
+                + "<h1>"
+                + escapeHtml(appTitle)
+                + "</h1>"
+                + "<p class=\"sub\">Starting…</p>"
+                + "<div class=\"spinner\" role=\"status\" aria-label=\"Loading\"></div>"
+                + "</body></html>";
+    }
+
+    private static byte[] readClasspathLogoPngBytes() {
+        ClassLoader[] loaders = {
+            Thread.currentThread().getContextClassLoader(),
+            FactoryMonitorDesktopApplication.class.getClassLoader()
+        };
+        for (ClassLoader cl : loaders) {
+            if (cl == null) {
+                continue;
+            }
+            try (InputStream in = cl.getResourceAsStream("static/images/app-logo.png")) {
+                if (in != null) {
+                    return in.readAllBytes();
+                }
+            } catch (IOException e) {
+                log.debug("Could not read splash logo from classpath: {}", e.getMessage());
+            }
+        }
+        return null;
     }
 
     private static String escapeHtml(String s) {
@@ -252,16 +326,6 @@ public class FactoryMonitorDesktopApplication extends Application {
         alert.setTitle("Production Calling System");
         alert.setHeaderText("Startup error");
         alert.setContentText(message != null ? message : "Unknown error");
-        alert.showAndWait();
-    }
-
-    private static void showCloseBlockedInfo() {
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle("Production Calling System");
-        alert.setHeaderText("Window close disabled");
-        alert.setContentText(
-                "This kiosk session stays running. To stop the application, sign in as an admin and use "
-                        + "Admin → Shut down application.");
         alert.showAndWait();
     }
 }

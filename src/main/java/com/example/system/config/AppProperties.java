@@ -56,6 +56,18 @@ public class AppProperties {
     private String audioUploadDir = "";
 
     /**
+     * Ephemeral MP3 previews for the admin workstation form (WAV/OGG before save). If blank, defaults to
+     * {@code {dataDir}/alert-audio-preview}.
+     */
+    @Getter(AccessLevel.NONE)
+    private String audioPreviewDir = "";
+
+    /**
+     * Files in {@link #getAudioPreviewDir()} older than this many hours are deleted on a schedule and at startup.
+     */
+    private int audioPreviewRetentionHours = 24;
+
+    /**
      * Path to the {@code ffmpeg} executable for OGG → MP3 conversion (desktop WebView and legacy {@code .ogg}
      * URLs). If blank, {@code ffmpeg} must be on {@code PATH}.
      */
@@ -66,5 +78,12 @@ public class AppProperties {
             return audioUploadDir;
         }
         return Paths.get(dataDir, "alert-audio").toString();
+    }
+
+    public String getAudioPreviewDir() {
+        if (audioPreviewDir != null && !audioPreviewDir.isBlank()) {
+            return audioPreviewDir;
+        }
+        return Paths.get(dataDir, "alert-audio-preview").toString();
     }
 }

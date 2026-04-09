@@ -4,6 +4,7 @@ import com.example.system.config.ModbusProperties;
 import com.example.system.domain.Workstation;
 import com.example.system.domain.WorkstationRole;
 import com.example.system.domain.WorkstationSlot;
+import com.example.system.dto.SlotAudioPatch;
 import com.example.system.dto.WorkstationForm;
 import com.example.system.dto.WorkstationFormPageData;
 import lombok.RequiredArgsConstructor;
@@ -64,21 +65,46 @@ public class WorkstationAdminService {
             form.setEngSlave(e.getOutputSlaveId());
             form.setEngRelay(e.getOutputChannel());
             form.setCurrentEngAudioPath(e.getAudioPath());
+            form.setCurrentEngAudioOriginalName(e.getAudioOriginalName());
         }
         if (l != null) {
             form.setLeadInputBit(l.getInputBitIndex());
             form.setLeadSlave(l.getOutputSlaveId());
             form.setLeadRelay(l.getOutputChannel());
             form.setCurrentLeadAudioPath(l.getAudioPath());
+            form.setCurrentLeadAudioOriginalName(l.getAudioOriginalName());
         }
         if (q != null) {
             form.setQcInputBit(q.getInputBitIndex());
             form.setQcSlave(q.getOutputSlaveId());
             form.setQcRelay(q.getOutputChannel());
             form.setCurrentQcAudioPath(q.getAudioPath());
+            form.setCurrentQcAudioOriginalName(q.getAudioOriginalName());
         }
         form.setPlaceAfterWorkstationId(defaultPlaceAfterForEdit(w.getId()));
         return form;
+    }
+
+    /**
+     * Restores {@code current*AudioPath} and {@code current*AudioOriginalName} from the database so the edit form
+     * still shows the right labels after a failed POST (those fields are not bound from the request).
+     */
+    public void refreshFormAudioFieldsFromDb(WorkstationForm form) {
+        if (form.getId() == null) {
+            return;
+        }
+        workstationService
+                .findByIdWithSlots(form.getId())
+                .ifPresent(
+                        w -> {
+                            WorkstationForm fresh = formFromWorkstation(w);
+                            form.setCurrentEngAudioPath(fresh.getCurrentEngAudioPath());
+                            form.setCurrentEngAudioOriginalName(fresh.getCurrentEngAudioOriginalName());
+                            form.setCurrentLeadAudioPath(fresh.getCurrentLeadAudioPath());
+                            form.setCurrentLeadAudioOriginalName(fresh.getCurrentLeadAudioOriginalName());
+                            form.setCurrentQcAudioPath(fresh.getCurrentQcAudioPath());
+                            form.setCurrentQcAudioOriginalName(fresh.getCurrentQcAudioOriginalName());
+                        });
     }
 
     public Long defaultPlaceAfterForEdit(Long id) {
@@ -158,9 +184,9 @@ public class WorkstationAdminService {
             }
         }
         boolean isNew = form.getId() == null;
-        String engAudio;
-        String leadAudio;
-        String qcAudio;
+        SlotAudioPatch engAudio;
+        SlotAudioPatch leadAudio;
+        SlotAudioPatch qcAudio;
         try {
             engAudio = resolveSlotAudio(form.isClearEngAudio(), engAudioFile, prevE, isNew);
             leadAudio = resolveSlotAudio(form.isClearLeadAudio(), leadAudioFile, prevL, isNew);
@@ -188,19 +214,38 @@ public class WorkstationAdminService {
         return Optional.empty();
     }
 
-    private String resolveSlotAudio(boolean clear, MultipartFile upload, String previousPath, boolean isNew)
+    private SlotAudioPatch resolveSlotAudio(boolean clear, MultipartFile upload, String previousPath, boolean isNew)
             throws IOException {
         if (clear) {
-            return null;
+            return new SlotAudioPatch(null, null, true);
         }
         String uploaded = audioStorageService.storeUpload(upload);
         if (uploaded != null) {
-            return uploaded;
+            return new SlotAudioPatch(uploaded, sanitizeAudioOriginalFilename(upload.getOriginalFilename()), true);
         }
         if (!isNew && previousPath != null && !previousPath.isBlank()) {
-            return previousPath;
+            return new SlotAudioPatch(previousPath, null, false);
         }
-        return null;
+        return new SlotAudioPatch(null, null, false);
+    }
+
+    static String sanitizeAudioOriginalFilename(String originalFilename) {
+        if (originalFilename == null || originalFilename.isBlank()) {
+            return "audio";
+        }
+        String base = originalFilename.replace('\\', '/');
+        int slash = base.lastIndexOf('/');
+        if (slash >= 0) {
+            base = base.substring(slash + 1);
+        }
+        base = base.trim();
+        if (base.isBlank() || base.contains("..") || base.indexOf('/') >= 0 || base.indexOf('\\') >= 0) {
+            return "audio";
+        }
+        if (base.length() > 255) {
+            base = base.substring(0, 255);
+        }
+        return base;
     }
 
     private Optional<String> validateBits(WorkstationForm form, int maxBit) {

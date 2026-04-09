@@ -28,6 +28,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
 import java.time.temporal.ChronoUnit;
@@ -41,6 +42,7 @@ public class EventExportService {
     private static final Color HEADER_BG = new Color(220, 220, 220);
     private static final Color ROW_ALT = new Color(248, 248, 248);
     private static final Locale PDF_LOCALE = Locale.ENGLISH;
+    private static final DateTimeFormatter EXPORT_LOCAL_TIME = DateTimeFormatter.ofPattern("HH:mm:ss");
 
     private final EventLogRepository events;
     private final AppProperties app;
@@ -48,8 +50,8 @@ public class EventExportService {
     /**
      * Writes all {@code event_log} rows with {@code event_time} in the inclusive local date range
      * {@code [start, end]}, as UTF-8 CSV (with BOM for Excel). Append-only: both OPEN and CLOSED rows
-     * appear. {@code event_time} is the UTC {@link Instant} as ISO-8601, truncated to whole seconds (no
-     * fractional part).
+     * appear. The last two columns are {@code event_date} ({@code yyyy-MM-dd}) and {@code event_time}
+     * ({@code HH:mm:ss}) in the JVM default time zone, second precision only (no fractional seconds).
      * <p>
      * Sets HTTP headers, filename, BOM, and body. Call after binding dates; propagates validation errors
      * from {@link #validateRange}.
@@ -64,7 +66,8 @@ public class EventExportService {
     }
 
     /**
-     * Writes CSV bytes to {@code out} for {@code [start, end]} (inclusive local dates). Validates range first.
+     * Writes CSV bytes to {@code out} for {@code [start, end]} (inclusive local dates). Same columns as
+     * {@link #writeCsvAttachment}; {@code event_date} / {@code event_time} use {@link ZoneId#systemDefault()}.
      */
     public void writeCsv(LocalDate start, LocalDate end, OutputStream out) throws IOException {
         List<EventRecord> rows = loadEventsInRange(start, end);
@@ -72,7 +75,8 @@ public class EventExportService {
     }
 
     /**
-     * Writes event rows in {@code [start, end]} as a PDF table. Same data window and columns as CSV.
+     * Writes event rows in {@code [start, end]} as a PDF table. Same data window and event date/time columns
+     * as CSV ({@code event_date} / {@code event_time} in {@link ZoneId#systemDefault()}, second precision).
      */
     public void writePdfAttachment(LocalDate start, LocalDate end, HttpServletResponse response) throws IOException {
         List<EventRecord> rows = loadEventsInRange(start, end);
@@ -92,9 +96,10 @@ public class EventExportService {
     }
 
     private void writeCsvBody(List<EventRecord> rows, OutputStream out) throws IOException {
+        ZoneId zone = ZoneId.systemDefault();
         try (OutputStreamWriter w = new OutputStreamWriter(out, StandardCharsets.UTF_8)) {
             w.write('\uFEFF');
-            w.write("id,mapping_id,input_bit_index,output_slave_id,output_channel,status,event_time\n");
+            w.write("id,mapping_id,input_bit_index,output_slave_id,output_channel,status,event_date,event_time\n");
             for (EventRecord e : rows) {
                 w.write(Long.toString(e.getId()));
                 w.write(',');
@@ -108,10 +113,39 @@ public class EventExportService {
                 w.write(',');
                 w.write(escapeCsv(e.getStatus() == null ? "" : e.getStatus().name()));
                 w.write(',');
-                w.write(escapeCsv(formatUtcInstantToSeconds(e.getEventTime())));
+                appendCsvEventDateTime(e.getEventTime(), zone, w);
                 w.write('\n');
             }
         }
+    }
+
+    private static void appendCsvEventDateTime(Instant instant, ZoneId zone, OutputStreamWriter w)
+            throws IOException {
+        if (instant == null) {
+            w.write(',');
+            return;
+        }
+        w.write(escapeCsv(formatExportEventDate(instant, zone)));
+        w.write(',');
+        w.write(escapeCsv(formatExportEventTime(instant, zone)));
+    }
+
+    /** {@code yyyy-MM-dd} in {@code zone}, or empty if {@code instant} is null. */
+    static String formatExportEventDate(Instant instant, ZoneId zone) {
+        if (instant == null) {
+            return "";
+        }
+        ZonedDateTime zdt = instant.truncatedTo(ChronoUnit.SECONDS).atZone(zone);
+        return zdt.format(DateTimeFormatter.ISO_LOCAL_DATE);
+    }
+
+    /** {@code HH:mm:ss} in {@code zone}, or empty if {@code instant} is null. */
+    static String formatExportEventTime(Instant instant, ZoneId zone) {
+        if (instant == null) {
+            return "";
+        }
+        ZonedDateTime zdt = instant.truncatedTo(ChronoUnit.SECONDS).atZone(zone);
+        return zdt.format(EXPORT_LOCAL_TIME);
     }
 
     private void writePdfBody(List<EventRecord> rows, LocalDate start, LocalDate end, OutputStream out)
@@ -134,9 +168,10 @@ public class EventExportService {
             Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8f);
             Font cellFont = FontFactory.getFont(FontFactory.HELVETICA, 7.5f);
 
-            PdfPTable table = new PdfPTable(7);
+            ZoneId zone = ZoneId.systemDefault();
+            PdfPTable table = new PdfPTable(8);
             table.setWidthPercentage(100);
-            table.setWidths(new float[] {0.65f, 0.95f, 0.85f, 0.95f, 0.95f, 0.75f, 2.9f});
+            table.setWidths(new float[] {0.65f, 0.95f, 0.85f, 0.95f, 0.95f, 0.75f, 1.15f, 1.75f});
             table.setSpacingBefore(4f);
 
             String[] headers = {
@@ -146,6 +181,7 @@ public class EventExportService {
                 "Output slave",
                 "Output channel",
                 "Status",
+                "Event date",
                 "Event time"
             };
             for (String h : headers) {
@@ -164,7 +200,8 @@ public class EventExportService {
                 table.addCell(dataCell(Integer.toString(e.getOutputChannel()), cellFont, bg));
                 table.addCell(
                         dataCell(e.getStatus() == null ? "" : e.getStatus().name(), cellFont, bg));
-                table.addCell(dataCell(formatUtcInstantToSeconds(e.getEventTime()), cellFont, bg));
+                table.addCell(dataCell(formatExportEventDate(e.getEventTime(), zone), cellFont, bg));
+                table.addCell(dataCell(formatExportEventTime(e.getEventTime(), zone), cellFont, bg));
                 i++;
             }
 
@@ -212,14 +249,6 @@ public class EventExportService {
         if (inclusiveDays > max) {
             throw new IllegalArgumentException("Date range cannot exceed " + max + " days (inclusive).");
         }
-    }
-
-    /** ISO-8601 UTC instant, second precision only (e.g. {@code 2026-03-22T01:54:27Z}). */
-    static String formatUtcInstantToSeconds(Instant instant) {
-        if (instant == null) {
-            return "";
-        }
-        return DateTimeFormatter.ISO_INSTANT.format(instant.truncatedTo(ChronoUnit.SECONDS));
     }
 
     static String escapeCsv(String raw) {

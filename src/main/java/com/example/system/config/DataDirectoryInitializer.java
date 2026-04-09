@@ -24,13 +24,25 @@ public class DataDirectoryInitializer implements ApplicationContextInitializer<C
         if (audioDir == null || audioDir.isBlank()) {
             audioDir = Path.of(dataDir, "alert-audio").toString();
         }
+        String previewDir = env.getProperty("system.audio-preview-dir");
+        if (previewDir == null || previewDir.isBlank()) {
+            previewDir = Path.of(dataDir, "alert-audio-preview").toString();
+        }
         try {
             Files.createDirectories(Path.of(dataDir));
             Files.createDirectories(Path.of(dataDir, "logs"));
             Files.createDirectories(Path.of(audioDir));
+            Files.createDirectories(Path.of(previewDir));
         } catch (IOException e) {
             throw new IllegalStateException(
-                    "Cannot create data directories (data-dir=" + dataDir + ", audio=" + audioDir + ")", e);
+                    "Cannot create data directories (data-dir="
+                            + dataDir
+                            + ", audio="
+                            + audioDir
+                            + ", preview="
+                            + previewDir
+                            + ")",
+                    e);
         }
     }
 }

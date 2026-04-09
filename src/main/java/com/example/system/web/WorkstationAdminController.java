@@ -16,6 +16,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.security.web.csrf.CsrfToken;
+
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.List;
 import java.util.Optional;
@@ -27,6 +30,18 @@ public class WorkstationAdminController {
 
     private final WorkstationService workstationService;
     private final WorkstationAdminService workstationAdminService;
+
+    /**
+     * Exposes the CSRF token for {@code workstation-form.html}. Thymeleaf SpringEL does not expose a non-null
+     * {@code #httpServletRequest}, so the token cannot be read safely in the template.
+     */
+    @ModelAttribute
+    public void workstationFormCsrf(HttpServletRequest request, Model model) {
+        Object attr = request.getAttribute(CsrfToken.class.getName());
+        if (attr instanceof CsrfToken token) {
+            model.addAttribute("workstationFormCsrf", token);
+        }
+    }
 
     @GetMapping
     public String list(Model model) {
@@ -67,6 +82,7 @@ public class WorkstationAdminController {
 
         Optional<String> validationError = workstationAdminService.validateWorkstationForm(form);
         if (validationError.isPresent()) {
+            workstationAdminService.refreshFormAudioFieldsFromDb(form);
             model.addAttribute("errorMessage", validationError.get());
             applyFormPageData(
                     model,
@@ -77,6 +93,7 @@ public class WorkstationAdminController {
         Optional<String> persistError =
                 workstationAdminService.persistWorkstationFromForm(form, engAudioFile, leadAudioFile, qcAudioFile);
         if (persistError.isPresent()) {
+            workstationAdminService.refreshFormAudioFieldsFromDb(form);
             model.addAttribute("errorMessage", persistError.get());
             applyFormPageData(
                     model,

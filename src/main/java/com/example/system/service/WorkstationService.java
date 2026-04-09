@@ -3,6 +3,7 @@ package com.example.system.service;
 import com.example.system.domain.Workstation;
 import com.example.system.domain.WorkstationRole;
 import com.example.system.domain.WorkstationSlot;
+import com.example.system.dto.SlotAudioPatch;
 import com.example.system.repository.WorkstationRepository;
 import com.example.system.repository.WorkstationSlotRepository;
 import jakarta.annotation.PostConstruct;
@@ -85,15 +86,15 @@ public class WorkstationService {
             int engBit,
             int engSlave,
             int engRelay,
-            String engAudio,
+            SlotAudioPatch engAudio,
             int leadBit,
             int leadSlave,
             int leadRelay,
-            String leadAudio,
+            SlotAudioPatch leadAudio,
             int qcBit,
             int qcSlave,
             int qcRelay,
-            String qcAudio) {
+            SlotAudioPatch qcAudio) {
         Map<WorkstationRole, WorkstationSlot> byRole = new EnumMap<>(WorkstationRole.class);
         for (WorkstationSlot s : workstation.getSlots()) {
             byRole.put(s.getRole(), s);
@@ -116,7 +117,7 @@ public class WorkstationService {
             int bit,
             int slave,
             int relay,
-            String audioPath) {
+            SlotAudioPatch audio) {
         WorkstationSlot s = byRole.get(role);
         if (s == null) {
             s = new WorkstationSlot();
@@ -127,7 +128,12 @@ public class WorkstationService {
         s.setInputBitIndex(bit);
         s.setOutputSlaveId(slave);
         s.setOutputChannel(relay);
-        s.setAudioPath(audioPath != null && !audioPath.isBlank() ? audioPath : null);
+        String path = audio.audioPath();
+        s.setAudioPath(path != null && !path.isBlank() ? path : null);
+        if (audio.touchOriginalName()) {
+            String name = audio.audioOriginalName();
+            s.setAudioOriginalName(name != null && !name.isBlank() ? name.trim() : null);
+        }
     }
 
     @Transactional(readOnly = true)

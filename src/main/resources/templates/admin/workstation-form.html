@@ -26,6 +26,7 @@
 
         <form th:action="@{/admin/workstations}" method="post" th:object="${form}" enctype="multipart/form-data" class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
             <input type="hidden" th:field="*{id}" th:if="${form.id != null}"/>
+            <input type="hidden" th:if="${workstationFormCsrf != null}" th:name="${workstationFormCsrf.parameterName}" th:value="${workstationFormCsrf.token}"/>
 
             <div class="p-6 sm:p-8 space-y-10">
                 <div>
@@ -101,11 +102,14 @@
                                         Clear
                                     </label>
                                 </div>
-                                <p th:if="${form.id != null and form.currentEngAudioPath != null}" class="text-xs text-gray-500 mb-3" th:text="'Current: ' + ${form.currentEngAudioPath}"></p>
+                                <p th:if="${form.id != null and form.currentEngAudioPath != null}" class="text-xs text-gray-500 mb-3">
+                                    <span class="text-gray-500">Current file: </span>
+                                    <span th:text="${(form.currentEngAudioOriginalName != null and !#strings.isEmpty(form.currentEngAudioOriginalName)) ? form.currentEngAudioOriginalName : 'Saved alert audio'}">Saved alert audio</span>
+                                </p>
                                 <div class="space-y-2">
-                                    <label class="text-sm text-gray-600">Upload audio (MP3, WAV, or OGG — OGG is converted to MP3 for the desktop app)</label>
+                                    <label class="text-sm text-gray-600">Upload audio (MP3, WAV, or OGG)</label>
                                     <input type="file" name="engAudioFile" id="ws-file-eng"
-                                           accept=".mp3,.wav,.ogg,audio/mpeg,audio/wav,audio/wave,audio/x-wav,audio/ogg,application/ogg"
+                                           accept=".mp3,.wav,.ogg"
                                            class="block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-medium"/>
                                 </div>
                             </div>
@@ -161,11 +165,14 @@
                                         Clear
                                     </label>
                                 </div>
-                                <p th:if="${form.id != null and form.currentLeadAudioPath != null}" class="text-xs text-gray-500 mb-3" th:text="'Current: ' + ${form.currentLeadAudioPath}"></p>
+                                <p th:if="${form.id != null and form.currentLeadAudioPath != null}" class="text-xs text-gray-500 mb-3">
+                                    <span class="text-gray-500">Current file: </span>
+                                    <span th:text="${(form.currentLeadAudioOriginalName != null and !#strings.isEmpty(form.currentLeadAudioOriginalName)) ? form.currentLeadAudioOriginalName : 'Saved alert audio'}">Saved alert audio</span>
+                                </p>
                                 <div class="space-y-2">
-                                    <label class="text-sm text-gray-600">Upload audio (MP3, WAV, or OGG — OGG is converted to MP3 for the desktop app)</label>
+                                    <label class="text-sm text-gray-600">Upload audio (MP3, WAV, or OGG)</label>
                                     <input type="file" name="leadAudioFile" id="ws-file-lead"
-                                           accept=".mp3,.wav,.ogg,audio/mpeg,audio/wav,audio/wave,audio/x-wav,audio/ogg,application/ogg"
+                                           accept=".mp3,.wav,.ogg"
                                            class="block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-medium"/>
                                 </div>
                             </div>
@@ -221,11 +228,14 @@
                                         Clear
                                     </label>
                                 </div>
-                                <p th:if="${form.id != null and form.currentQcAudioPath != null}" class="text-xs text-gray-500 mb-3" th:text="'Current: ' + ${form.currentQcAudioPath}"></p>
+                                <p th:if="${form.id != null and form.currentQcAudioPath != null}" class="text-xs text-gray-500 mb-3">
+                                    <span class="text-gray-500">Current file: </span>
+                                    <span th:text="${(form.currentQcAudioOriginalName != null and !#strings.isEmpty(form.currentQcAudioOriginalName)) ? form.currentQcAudioOriginalName : 'Saved alert audio'}">Saved alert audio</span>
+                                </p>
                                 <div class="space-y-2">
-                                    <label class="text-sm text-gray-600">Upload audio (MP3, WAV, or OGG — OGG is converted to MP3 for the desktop app)</label>
+                                    <label class="text-sm text-gray-600">Upload audio (MP3, WAV, or OGG)</label>
                                     <input type="file" name="qcAudioFile" id="ws-file-qc"
-                                           accept=".mp3,.wav,.ogg,audio/mpeg,audio/wav,audio/wave,audio/x-wav,audio/ogg,application/ogg"
+                                           accept=".mp3,.wav,.ogg"
                                            class="block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-medium"/>
                                 </div>
                             </div>
@@ -250,9 +260,35 @@
 <script>
     (function () {
         var objectUrls = { eng: null, lead: null, qc: null };
+        var previewControllers = { eng: null, lead: null, qc: null };
+        var serverPreviewIds = { eng: null, lead: null, qc: null };
         var AUDIO_EXT = /\.(mp3|wav|ogg)$/i;
+        var MP3_EXT = /\.mp3$/i;
+        var PREVIEW_URL_ID = /\/admin\/workstations\/audio-preview\/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})\.mp3/i;
 
-        function revokeSlot(slot) {
+        function deleteServerPreview(id, keepalive) {
+            if (!id) return;
+            var url = new URL('/admin/workstations/audio-preview/' + id + '.mp3', window.location.origin);
+            var opts = { method: 'DELETE', credentials: 'same-origin' };
+            if (keepalive) {
+                opts.keepalive = true;
+            }
+            try {
+                fetch(url, opts);
+            } catch (e) { /* ignore */ }
+        }
+
+        function revokeSlot(slot, keepaliveDelete) {
+            if (previewControllers[slot]) {
+                try {
+                    previewControllers[slot].abort();
+                } catch (e) { /* ignore */ }
+                previewControllers[slot] = null;
+            }
+            if (serverPreviewIds[slot]) {
+                deleteServerPreview(serverPreviewIds[slot], !!keepaliveDelete);
+                serverPreviewIds[slot] = null;
+            }
             if (objectUrls[slot]) {
                 URL.revokeObjectURL(objectUrls[slot]);
                 objectUrls[slot] = null;
@@ -289,8 +325,6 @@
             }
             var a = new Audio(src);
             window._wsAudioPreview = a;
-            // Only use play()'s promise for user-visible errors. A separate "error" event often fires
-            // transiently (or when swapping clips) even when playback succeeds — that caused false alerts.
             a.play().catch(function (err) {
                 if (err && err.name === 'NotAllowedError') {
                     window.alert('Tap Play again — the browser required a click or tap on this page first.');
@@ -299,6 +333,50 @@
                 }
             });
         };
+
+        function startServerPreview(slot, file, fileInput, playBtn, clearCheckbox) {
+            var ac = new AbortController();
+            previewControllers[slot] = ac;
+            setPlayUi(playBtn, false);
+            var fd = new FormData();
+            fd.append('file', file);
+            fetch(new URL('/admin/workstations/audio-preview', window.location.origin), {
+                method: 'POST',
+                body: fd,
+                credentials: 'same-origin',
+                signal: ac.signal
+            }).then(function (r) {
+                if (!r.ok) {
+                    return r.text().then(function (t) {
+                        throw new Error(t && t.trim() ? t.trim() : ('HTTP ' + r.status));
+                    });
+                }
+                return r.json();
+            }).then(function (j) {
+                if (previewControllers[slot] !== ac) return;
+                var u = j && j.url;
+                if (!u) {
+                    throw new Error('Invalid preview response');
+                }
+                var abs = new URL(u, window.location.href).href;
+                var m = PREVIEW_URL_ID.exec(u);
+                serverPreviewIds[slot] = m ? m[1] : null;
+                playBtn.setAttribute('data-audio-src', abs);
+                setPlayUi(playBtn, true);
+                window.playWorkstationAudioPreview(playBtn);
+            }).catch(function (err) {
+                if (err.name === 'AbortError') return;
+                if (previewControllers[slot] !== ac) return;
+                window.alert(err.message || 'Could not prepare preview (install FFmpeg or use MP3).');
+                fileInput.value = '';
+                previewControllers[slot] = null;
+                syncSlot(slot, fileInput, playBtn, clearCheckbox);
+            }).finally(function () {
+                if (previewControllers[slot] === ac) {
+                    previewControllers[slot] = null;
+                }
+            });
+        }
 
         function syncSlot(slot, fileInput, playBtn, clearCheckbox) {
             revokeSlot(slot);
@@ -315,11 +393,16 @@
             }
 
             if (file) {
-                var url = URL.createObjectURL(file);
-                objectUrls[slot] = url;
-                playBtn.setAttribute('data-audio-src', url);
-                setPlayUi(playBtn, true);
-                window.playWorkstationAudioPreview(playBtn);
+                var name = file.name || '';
+                if (MP3_EXT.test(name)) {
+                    var blobUrl = URL.createObjectURL(file);
+                    objectUrls[slot] = blobUrl;
+                    playBtn.setAttribute('data-audio-src', blobUrl);
+                    setPlayUi(playBtn, true);
+                    window.playWorkstationAudioPreview(playBtn);
+                    return;
+                }
+                startServerPreview(slot, file, fileInput, playBtn, clearCheckbox);
                 return;
             }
 
@@ -330,7 +413,8 @@
             }
 
             if (saved) {
-                playBtn.setAttribute('data-audio-src', saved);
+                var rel = saved.charAt(0) === '/' ? saved : ('/' + saved);
+                playBtn.setAttribute('data-audio-src', new URL(rel, window.location.href).href);
                 setPlayUi(playBtn, true);
                 return;
             }
@@ -359,6 +443,11 @@
             wire('lead', 'ws-file-lead', 'ws-play-lead', 'clearLeadAudio');
             wire('qc', 'ws-file-qc', 'ws-play-qc', 'clearQcAudio');
         }
+        window.addEventListener('pagehide', function () {
+            revokeSlot('eng', true);
+            revokeSlot('lead', true);
+            revokeSlot('qc', true);
+        });
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', bootWorkstationAudioPreview);
         } else {

@@ -31,8 +31,12 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/admin/**", "/report/**").authenticated()
-                        .anyRequest().permitAll())
+                        .requestMatchers("/admin/workstations/audio-preview", "/admin/workstations/audio-preview/**")
+                        .permitAll()
+                        .requestMatchers("/admin/**", "/report/**")
+                        .authenticated()
+                        .anyRequest()
+                        .permitAll())
                 .addFilterAfter(dashboardSessionInvalidateFilter, SecurityContextHolderFilter.class)
                 .formLogin(form -> form
                         .loginPage("/login")
@@ -49,7 +53,9 @@ public class SecurityConfig {
                                     response.sendRedirect(response.encodeRedirectURL(url));
                                 })
                         .permitAll())
-                .headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin));
+                .headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin))
+                .csrf(csrf -> csrf.ignoringRequestMatchers(
+                        "/admin/workstations/audio-preview", "/admin/workstations/audio-preview/**"));
         return http.build();
     }
 }
