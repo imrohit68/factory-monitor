@@ -23,7 +23,7 @@
             </div>
 
             <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden max-w-2xl">
-                <form method="get" th:action="@{/report/export.csv}" class="p-6 sm:p-8 space-y-6">
+                <form id="event-export-form" class="p-6 sm:p-8 space-y-6" action="#" onsubmit="return false;">
                     <div class="bg-blue-50/50 border border-blue-100 rounded-lg p-4 flex items-start gap-3">
                         <iconify-icon icon="solar:info-circle-linear" class="text-xl text-blue-500 shrink-0 mt-0.5"></iconify-icon>
                         <p class="text-sm font-normal text-blue-800">
@@ -46,12 +46,12 @@
                         </div>
                     </div>
                     <div class="pt-2 flex flex-wrap items-center justify-end gap-3 border-t border-gray-100">
-                        <button type="submit" th:formaction="@{/report/export.pdf}"
+                        <button type="button" id="event-export-pdf"
                                 class="uc-motion inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-white text-base font-normal text-gray-900 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 shadow-sm">
                             <iconify-icon icon="solar:document-text-linear" class="text-xl"></iconify-icon>
                             Download PDF
                         </button>
-                        <button type="submit" th:formaction="@{/report/export.csv}"
+                        <button type="button" id="event-export-csv"
                                 class="uc-motion inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-900 text-base font-normal text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 shadow-sm">
                             <iconify-icon icon="solar:download-linear" class="text-xl"></iconify-icon>
                             Download CSV
@@ -62,5 +62,81 @@
         </div>
     </main>
 </div>
+<script>
+(function () {
+    function parseFilename(cd) {
+        if (!cd) return null;
+        var star = /filename\*=UTF-8''([^;\s]+)/i.exec(cd);
+        if (star) {
+            try {
+                return decodeURIComponent(star[1].trim());
+            } catch (e) {
+                return star[1].trim();
+            }
+        }
+        var q = /filename="([^"]+)"/i.exec(cd);
+        if (q) return q[1];
+        var u = /filename=([^;\s]+)/i.exec(cd);
+        if (u) return u[1].replace(/^["']|["']$/g, '');
+        return null;
+    }
+    function triggerBlobDownload(blob, filename) {
+        var a = document.createElement('a');
+        var url = URL.createObjectURL(blob);
+        a.href = url;
+        a.download = filename || 'download';
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        URL.revokeObjectURL(url);
+        a.remove();
+    }
+    function downloadExport(kind) {
+        var form = document.getElementById('event-export-form');
+        if (!form) return;
+        var startEl = form.querySelector('[name="start"]');
+        var endEl = form.querySelector('[name="end"]');
+        var start = startEl && startEl.value;
+        var end = endEl && endEl.value;
+        if (!start || !end) {
+            window.alert('Please choose both dates.');
+            return;
+        }
+        var path = kind === 'pdf' ? '/report/export.pdf' : '/report/export.csv';
+        var url = new URL(path, window.location.origin);
+        url.searchParams.set('start', start);
+        url.searchParams.set('end', end);
+        fetch(url.toString(), { credentials: 'same-origin' })
+            .then(function (r) {
+                if (!r.ok) {
+                    return r.text().then(function (t) {
+                        throw new Error(t && t.trim() ? t.trim() : ('HTTP ' + r.status));
+                    });
+                }
+                var fn = parseFilename(r.headers.get('Content-Disposition'));
+                if (!fn) {
+                    fn = kind === 'pdf' ? 'event-log.pdf' : 'event-log.csv';
+                }
+                return r.blob().then(function (blob) {
+                    triggerBlobDownload(blob, fn);
+                });
+            })
+            .catch(function (err) {
+                window.alert(err.message || 'Download failed.');
+            });
+    }
+    function boot() {
+        var pdf = document.getElementById('event-export-pdf');
+        var csv = document.getElementById('event-export-csv');
+        if (pdf) pdf.addEventListener('click', function () { downloadExport('pdf'); });
+        if (csv) csv.addEventListener('click', function () { downloadExport('csv'); });
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', boot);
+    } else {
+        boot();
+    }
+})();
+</script>
 </body>
 </html>
