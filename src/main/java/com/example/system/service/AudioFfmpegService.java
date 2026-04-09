@@ -141,16 +141,27 @@ public class AudioFfmpegService {
             }
         }
         throw new IOException(
-                "FFmpeg not found (needed for OGG uploads). Install it and/or fix your PATH, or set "
-                        + "system.audio-ffmpeg-path. Examples: macOS: brew install ffmpeg (often "
-                        + "/opt/homebrew/bin/ffmpeg). Windows: winget install ffmpeg. "
-                        + "If you run from an IDE, add FFmpeg to PATH or set the full path in configuration.");
+                "FFmpeg not found (needed for OGG uploads). Install it, add it to PATH, or set "
+                        + "system.audio-ffmpeg-path. The Windows installer bundles ffmpeg.exe next to the app; "
+                        + "macOS: brew install ffmpeg. If you run from an IDE, set the full path in configuration.");
     }
 
     private static List<String> defaultFfmpegCandidates() {
         List<String> list = new ArrayList<>();
-        list.add("ffmpeg");
         String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+        String userDir = System.getProperty("user.dir");
+        if (userDir != null && !userDir.isBlank()) {
+            Path base = Path.of(userDir).toAbsolutePath().normalize();
+            if (os.contains("windows")) {
+                // jpackage / NSIS install dir: ProductionCallingSystem.exe and bundled ffmpeg.exe
+                list.add(base.resolve("ffmpeg.exe").toString());
+                list.add(base.resolve("bin").resolve("ffmpeg.exe").toString());
+            } else {
+                list.add(base.resolve("ffmpeg").toString());
+                list.add(base.resolve("bin").resolve("ffmpeg").toString());
+            }
+        }
+        list.add("ffmpeg");
         if (os.contains("mac")) {
             list.add("/opt/homebrew/bin/ffmpeg");
             list.add("/usr/local/bin/ffmpeg");

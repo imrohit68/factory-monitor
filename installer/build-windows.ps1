@@ -100,6 +100,35 @@ if (Test-Path -LiteralPath $LogoPng) {
     Write-Host "==> Copied app-logo.png into app image (optional branding beside launcher)"
 }
 
+# FFmpeg next to ProductionCallingSystem.exe — Java discovers user.dir\ffmpeg.exe first (OGG -> MP3).
+$DestFfmpeg = Join-Path $AppImageDir "ffmpeg.exe"
+$ManualFfmpeg = Join-Path $PSScriptRoot "windows\ffmpeg.exe"
+if (Test-Path -LiteralPath $ManualFfmpeg) {
+    Copy-Item -LiteralPath $ManualFfmpeg -Destination $DestFfmpeg -Force
+    Write-Host "==> Bundled FFmpeg from installer\windows\ffmpeg.exe"
+} else {
+    Write-Host "==> Downloading FFmpeg win64 GPL (BtbN) for OGG transcoding..."
+    $zipUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
+    $zipPath = Join-Path $StageDir "ffmpeg-win64-gpl.zip"
+    $extractDir = Join-Path $StageDir "ffmpeg-extract-bundle"
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        Invoke-WebRequest -Uri $zipUrl -OutFile $zipPath -UseBasicParsing
+        if (Test-Path -LiteralPath $extractDir) { Remove-Item -LiteralPath $extractDir -Recurse -Force }
+        New-Item -ItemType Directory -Path $extractDir -Force | Out-Null
+        Expand-Archive -LiteralPath $zipPath -DestinationPath $extractDir -Force
+        $ff = Get-ChildItem -LiteralPath $extractDir -Recurse -Filter "ffmpeg.exe" -File | Select-Object -First 1
+        if (-not $ff) {
+            Write-Error "Downloaded FFmpeg zip did not contain ffmpeg.exe"
+        }
+        Copy-Item -LiteralPath $ff.FullName -Destination $DestFfmpeg -Force
+        Write-Host "==> Bundled FFmpeg: $DestFfmpeg"
+    } finally {
+        if (Test-Path -LiteralPath $zipPath) { Remove-Item -LiteralPath $zipPath -Force -ErrorAction SilentlyContinue }
+        if (Test-Path -LiteralPath $extractDir) { Remove-Item -LiteralPath $extractDir -Recurse -Force -ErrorAction SilentlyContinue }
+    }
+}
+
 Write-Host "==> NSIS (makensis)"
 Set-Location $PSScriptRoot
 $makensis = Get-Command makensis -ErrorAction SilentlyContinue
