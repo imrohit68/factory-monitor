@@ -17,6 +17,10 @@ import org.springframework.context.ApplicationListener;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
+import java.net.CookieHandler;
+import java.net.CookieManager;
+import java.net.CookiePolicy;
+
 @SpringBootApplication
 @EnableScheduling
 @EnableConfigurationProperties({ModbusProperties.class, AppProperties.class})
@@ -28,6 +32,7 @@ public class MonitorApplication {
         SingleInstanceSupport.prepareBeforeSpring(args);
         if (SingleInstanceSupport.isDesktopMode()) {
             Platform.setImplicitExit(false);
+            CookieHandler.setDefault(new CookieManager(null, CookiePolicy.ACCEPT_ALL));
             Application.launch(FactoryMonitorDesktopApplication.class, args);
             return;
         }

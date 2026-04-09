@@ -33,7 +33,7 @@ public class AudioStorageService {
 
     /**
      * Saves alert audio under {@link AppProperties#getAudioUploadDir()} and returns a public URL path
-     * such as {@code /audio/uploads/<uuid>.mp3}. OGG uploads are transcoded to MP3 for JavaFX WebView playback.
+     * such as {@code /audio/uploads/<uuid>.mp3}. OGG and WAV uploads are transcoded to MP3 for JavaFX WebView playback.
      *
      * @throws IOException if the file is not an allowed type or FFmpeg is required but fails
      */
@@ -63,6 +63,22 @@ public class AudioStorageService {
             } finally {
                 try {
                     Files.deleteIfExists(tempOgg);
+                } catch (IOException e) {
+                    // best-effort cleanup
+                }
+            }
+        }
+
+        if ("wav".equals(extLower)) {
+            Path tempWav = Files.createTempFile(dir, "upload-" + id + "-", ".wav");
+            try {
+                file.transferTo(tempWav);
+                Path mp3 = dir.resolve(id + ".mp3");
+                audioFfmpegService.transcodeToMp3(tempWav, mp3);
+                return "/audio/uploads/" + id + ".mp3";
+            } finally {
+                try {
+                    Files.deleteIfExists(tempWav);
                 } catch (IOException e) {
                     // best-effort cleanup
                 }

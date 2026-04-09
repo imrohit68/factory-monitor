@@ -82,6 +82,15 @@
             window.alert('Please choose both dates.');
             return;
         }
+        var desktop = window.factoryMonitorDesktop;
+        if (desktop && typeof desktop.saveEventLogExport === 'function') {
+            try {
+                desktop.saveEventLogExport(kind, start, end);
+            } catch (ex) {
+                window.alert(ex && ex.message ? ex.message : 'Download failed.');
+            }
+            return;
+        }
         var path = kind === 'pdf' ? '/report/export.pdf' : '/report/export.csv';
         var url = new URL(path, window.location.origin);
         url.searchParams.set('start', start);

@@ -23,7 +23,7 @@ import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Serves uploaded alert audio. OGG (and legacy OGA) URLs redirect to an MP3 sidecar, creating it via FFmpeg if
+ * Serves uploaded alert audio. OGG/OGA and legacy WAV URLs redirect to an MP3 sidecar, creating it via FFmpeg if
  * needed, so JavaFX WebView can play alerts.
  */
 @RestController
@@ -48,8 +48,11 @@ public class AudioUploadController {
         if (lower.endsWith(".ogg") || lower.endsWith(".oga")) {
             return serveOggAlias(fileName, base);
         }
+        if (lower.endsWith(".wav")) {
+            return serveWavAlias(fileName, base);
+        }
 
-        if (!lower.endsWith(".mp3") && !lower.endsWith(".wav")) {
+        if (!lower.endsWith(".mp3")) {
             return ResponseEntity.notFound().build();
         }
 
@@ -58,12 +61,8 @@ public class AudioUploadController {
         }
 
         Resource body = new FileSystemResource(file);
-        MediaType media =
-                lower.endsWith(".wav")
-                        ? MediaType.parseMediaType("audio/wav")
-                        : MediaType.parseMediaType("audio/mpeg");
         return ResponseEntity.ok()
-                .contentType(media)
+                .contentType(MediaType.parseMediaType("audio/mpeg"))
                 .cacheControl(CacheControl.maxAge(7, TimeUnit.DAYS).cachePublic())
                 .body(body);
     }
@@ -84,6 +83,29 @@ public class AudioUploadController {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                     .header(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN_VALUE)
                     .body("Could not transcode OGG to MP3. Install FFmpeg or set system.audio-ffmpeg-path.");
+        }
+        if (!Files.isRegularFile(mp3)) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+        return redirectToMp3(stem);
+    }
+
+    private ResponseEntity<?> serveWavAlias(String fileName, Path base) {
+        String stem = fileName.substring(0, fileName.length() - 4);
+        Path mp3 = base.resolve(stem + ".mp3");
+        if (Files.isRegularFile(mp3)) {
+            return redirectToMp3(stem);
+        }
+        Path wav = base.resolve(fileName);
+        if (!Files.isRegularFile(wav)) {
+            return ResponseEntity.notFound().build();
+        }
+        try {
+            audioFfmpegService.transcodeToMp3(wav, mp3);
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .header(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN_VALUE)
+                    .body("Could not transcode WAV to MP3. Install FFmpeg or set system.audio-ffmpeg-path.");
         }
         if (!Files.isRegularFile(mp3)) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();

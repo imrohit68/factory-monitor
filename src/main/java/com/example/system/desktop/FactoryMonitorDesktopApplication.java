@@ -12,9 +12,12 @@ import javafx.scene.paint.Color;
 import javafx.scene.paint.CycleMethod;
 import javafx.scene.paint.LinearGradient;
 import javafx.scene.paint.Stop;
+import javafx.concurrent.Worker;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.web.WebView;
 import javafx.stage.Stage;
-import javafx.stage.StageStyle;
+import netscape.javascript.JSObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.SpringApplication;
@@ -31,9 +34,10 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Embeds the Spring Boot dashboard in a JavaFX {@link WebView}: dedicated window. Whether closing the window exits
- * the JVM is controlled by {@link SingleInstanceSupport#isDesktopAllowWindowClose()}; when false, the stage is
- * undecorated (no close button) and operators stop the app via Admin → Shut down application. Single-instance
- * re-launch focuses this window via {@link InstanceActivationServer}.
+ * the JVM is controlled by {@link SingleInstanceSupport#isDesktopAllowWindowClose()}; when false, the close
+ * request is ignored and an informational dialog explains that admins must use Admin → Shut down application.
+ * Press F11 to toggle fullscreen after Esc exits it. Single-instance re-launch focuses this window via
+ * {@link InstanceActivationServer}.
  */
 public class FactoryMonitorDesktopApplication extends Application {
 
@@ -51,9 +55,6 @@ public class FactoryMonitorDesktopApplication extends Application {
         String windowTitle = resolveWindowTitle();
         stage.setTitle(windowTitle);
         applyStageIcon(stage);
-        if (!SingleInstanceSupport.isDesktopAllowWindowClose()) {
-            stage.initStyle(StageStyle.UNDECORATED);
-        }
         WebView webView = new WebView();
         webView.setStyle("-fx-background-color: transparent;");
         webView.getEngine().loadContent(buildSplashHtml(windowTitle));
@@ -65,8 +66,11 @@ public class FactoryMonitorDesktopApplication extends Application {
                     e.consume();
                     if (SingleInstanceSupport.isDesktopAllowWindowClose()) {
                         shutdown(stage);
+                    } else {
+                        showCloseBlockedHint();
                     }
                 });
+        installDesktopChrome(scene, stage, webView, httpPort);
         applyDesktopFullscreen(stage);
         stage.show();
 
@@ -257,12 +261,50 @@ public class FactoryMonitorDesktopApplication extends Application {
         return null;
     }
 
+    private void installDesktopChrome(Scene scene, Stage stage, WebView webView, int httpPort) {
+        scene.addEventFilter(
+                KeyEvent.KEY_PRESSED,
+                e -> {
+                    if (e.getCode() == KeyCode.F11) {
+                        stage.setFullScreen(!stage.isFullScreen());
+                        e.consume();
+                    }
+                });
+        log.info(
+                "Desktop: press F11 to toggle fullscreen (Esc exits fullscreen). "
+                        + "Event log CSV/PDF uses a save dialog when downloaded from this app.");
+        webView
+                .getEngine()
+                .getLoadWorker()
+                .stateProperty()
+                .addListener(
+                        (obs, oldState, newState) -> {
+                            if (newState == Worker.State.SUCCEEDED) {
+                                injectExportBridge(webView, stage, httpPort);
+                            }
+                        });
+    }
+
+    private static void injectExportBridge(WebView webView, Stage stage, int httpPort) {
+        try {
+            JSObject win = (JSObject) webView.getEngine().executeScript("window");
+            if (win == null) {
+                return;
+            }
+            win.setMember("factoryMonitorDesktop", new DesktopEventLogExportBridge(stage, httpPort));
+        } catch (Exception e) {
+            log.debug("Could not inject desktop export bridge: {}", e.toString());
+        }
+    }
+
     private static void applyDesktopFullscreen(Stage stage) {
         if (!SingleInstanceSupport.isDesktopFullscreen()) {
             return;
         }
         stage.setFullScreen(true);
-        log.info("Desktop window: exclusive fullscreen enabled (Esc exits fullscreen; set system.desktop-fullscreen=false for a normal window).");
+        log.info(
+                "Desktop window: exclusive fullscreen enabled on startup (Esc exits; F11 toggles). "
+                        + "Set system.desktop-fullscreen=false for a normal window.");
     }
 
     static String humanizeAppName(String raw) {
@@ -326,6 +368,16 @@ public class FactoryMonitorDesktopApplication extends Application {
         alert.setTitle("Production Calling System");
         alert.setHeaderText("Startup error");
         alert.setContentText(message != null ? message : "Unknown error");
+        alert.showAndWait();
+    }
+
+    private static void showCloseBlockedHint() {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Production Calling System");
+        alert.setHeaderText("Window close disabled");
+        alert.setContentText(
+                "This session stays running. To stop the application, sign in as an admin and use "
+                        + "Admin → Shut down application.");
         alert.showAndWait();
     }
 }
