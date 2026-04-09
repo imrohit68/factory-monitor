@@ -162,6 +162,13 @@ public class ModbusMasterService {
      * {@code coilStartAddress + (relayNumber - 1)}.
      */
     public void writeRelayOutput(int outputSlaveId, int relayNumber, boolean energized) {
+        writeRelayOutput(outputSlaveId, relayNumber, energized, false);
+    }
+
+    /**
+     * @param quietSuccessLog when true, log successful writes at DEBUG (for per-poll input/output sync).
+     */
+    public void writeRelayOutput(int outputSlaveId, int relayNumber, boolean energized, boolean quietSuccessLog) {
         int channels = props.getRelayChannelsPerSlave();
         if (relayNumber < 1 || relayNumber > channels) {
             log.warn(
@@ -186,14 +193,25 @@ public class ModbusMasterService {
         try {
             int coilAddress = props.getCoilStartAddress() + coilIndex;
             master.writeCoil(outputSlaveId, coilAddress, energized);
-            log.info(
-                    "Modbus OUTPUT FC05 slave={} relay={} coilIndex={} coilAddress=0x{} (start={}+idx) energized={}",
-                    outputSlaveId,
-                    relayNumber,
-                    coilIndex,
-                    String.format("%04X", coilAddress & 0xFFFF),
-                    props.getCoilStartAddress(),
-                    energized);
+            if (quietSuccessLog) {
+                log.debug(
+                        "Modbus OUTPUT FC05 slave={} relay={} coilIndex={} coilAddress=0x{} (start={}+idx) energized={}",
+                        outputSlaveId,
+                        relayNumber,
+                        coilIndex,
+                        String.format("%04X", coilAddress & 0xFFFF),
+                        props.getCoilStartAddress(),
+                        energized);
+            } else {
+                log.info(
+                        "Modbus OUTPUT FC05 slave={} relay={} coilIndex={} coilAddress=0x{} (start={}+idx) energized={}",
+                        outputSlaveId,
+                        relayNumber,
+                        coilIndex,
+                        String.format("%04X", coilAddress & 0xFFFF),
+                        props.getCoilStartAddress(),
+                        energized);
+            }
         } catch (Exception e) {
             lastError = toUserFacingMessage(e, UserErrorContext.WRITE_OUTPUTS);
             log.warn(

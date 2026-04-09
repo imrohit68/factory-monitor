@@ -61,6 +61,15 @@ public class OrchestrationService {
         Set<Long> activeSlotIds = Set.copyOf(slots.stream().map(WorkstationSlot::getId).toList());
         channelBySlotId.keySet().removeIf(id -> !activeSlotIds.contains(id));
 
+        if (modbusMaster.isConnected()) {
+            for (WorkstationSlot slot : slots) {
+                int idx = slot.getInputBitIndex();
+                boolean energized = idx >= 0 && idx < bits.length && bits[idx];
+                modbusMaster.writeRelayOutput(
+                        slot.getOutputSlaveId(), slot.getOutputChannel(), energized, true);
+            }
+        }
+
         for (WorkstationSlot slot : slots) {
             int idx = slot.getInputBitIndex();
             boolean level = idx >= 0 && idx < bits.length && bits[idx];
@@ -77,7 +86,6 @@ public class OrchestrationService {
                         slot.getOutputSlaveId(),
                         slot.getOutputChannel());
         openEventIdsBySlotId.put(slot.getId(), id);
-        modbusMaster.writeRelayOutput(slot.getOutputSlaveId(), slot.getOutputChannel(), true);
         log.info(
                 "OPEN slotId={} inputBit={} -> slave={} relay={} eventId={}",
                 slot.getId(),
@@ -98,7 +106,6 @@ public class OrchestrationService {
                             slot.getOutputSlaveId(),
                             slot.getOutputChannel());
         }
-        modbusMaster.writeRelayOutput(slot.getOutputSlaveId(), slot.getOutputChannel(), false);
         log.info(
                 "CLOSED slotId={} inputBit={} -> slave={} relay={} openEventId={} closeEventId={}",
                 slot.getId(),

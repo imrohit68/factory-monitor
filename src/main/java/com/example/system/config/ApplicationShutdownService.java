@@ -5,7 +5,7 @@ import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.stereotype.Service;
 
 /**
- * Stops the Spring context and exits the JVM (e.g. stale browser-tab heartbeat shutdown).
+ * Stops the Spring context and exits the JVM (e.g. admin-initiated shutdown).
  */
 @Service
 public class ApplicationShutdownService {

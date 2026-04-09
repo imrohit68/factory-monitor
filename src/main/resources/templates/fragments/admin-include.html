@@ -19,7 +19,6 @@
         ::-webkit-scrollbar-thumb:hover { background: #d1d5db; }
         iconify-icon { display: inline-block; vertical-align: middle; }
     </style>
-    <th:block th:replace="~{fragments/desktop-heartbeat :: script}"/>
 </head>
 
 <header th:fragment="pageHeader" class="app-nav-bar shrink-0 z-30">
@@ -60,6 +59,12 @@
        class="uc-motion flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-normal">
         <iconify-icon icon="solar:usb-linear" class="text-xl" th:classappend="${active == 'device-config'} ? 'text-gray-300' : 'text-gray-400'"></iconify-icon>
         Configure device
+    </a>
+    <a th:href="@{/admin/shutdown}"
+       th:classappend="${active == 'shutdown'} ? ' bg-gray-900 text-white shadow-sm' : ' text-gray-600 hover:bg-gray-100'"
+       class="uc-motion flex items-center gap-3 px-3 py-2.5 rounded-lg text-base font-normal">
+        <iconify-icon icon="solar:power-linear" class="text-xl" th:classappend="${active == 'shutdown'} ? 'text-gray-300' : 'text-gray-400'"></iconify-icon>
+        Shut down application
     </a>
 </aside>
 

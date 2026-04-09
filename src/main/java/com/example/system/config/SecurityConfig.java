@@ -34,7 +34,6 @@ public class SecurityConfig {
                         .requestMatchers("/admin/**", "/report/**").authenticated()
                         .anyRequest().permitAll())
                 .addFilterAfter(dashboardSessionInvalidateFilter, SecurityContextHolderFilter.class)
-                .csrf(csrf -> csrf.ignoringRequestMatchers("/internal/desktop-heartbeat"))
                 .formLogin(form -> form
                         .loginPage("/login")
                         .defaultSuccessUrl("/admin", false)

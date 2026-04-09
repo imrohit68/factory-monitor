@@ -57,7 +57,7 @@ if (Test-Path -LiteralPath $AppImageDir) {
 New-Item -ItemType Directory -Path $StageDir -Force | Out-Null
 
 $IconIco = Join-Path $PSScriptRoot "windows\app-icon.ico"
-# Packaged .exe: browser UI + heartbeat shutdown (same defaults as application.properties; -D overrides jar).
+# Packaged .exe: browser UI; stop via Admin → Shut down application.
 $JpkgArgs = @(
     '--type', 'app-image',
     '--name', 'ProductionCallingSystem',
@@ -68,7 +68,6 @@ $JpkgArgs = @(
     '--java-options', '-Dfile.encoding=UTF-8',
     '--java-options', '-Dsystem.desktop-mode=false',
     '--java-options', '-Dsystem.launch-browser=true',
-    '--java-options', '-Dsystem.exit-on-browser-close=true',
     '--app-version', '0.0.1'
 )
 if (Test-Path -LiteralPath $IconIco) {

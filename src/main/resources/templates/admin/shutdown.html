@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/admin-include :: head('Shut down application')}">
+    <title>Shut down application</title>
+</head>
+<body class="bg-[#FFF9F2] text-gray-900 h-screen overflow-hidden flex flex-col antialiased font-sans text-base">
+
+<th:block th:replace="~{fragments/admin-include :: pageHeader}"/>
+
+<div class="flex-1 flex min-h-0 max-w-7xl w-full mx-auto px-6 py-4 md:py-6 gap-8">
+    <th:block th:replace="~{fragments/admin-include :: sidebar('shutdown')}"/>
+
+    <main class="uc-page-enter flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
+        <div class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-1 space-y-6 max-w-xl">
+            <div class="flex items-center gap-4 mb-2 shrink-0">
+                <a th:href="@{/admin/device-config(cb=${#dates.createNow().getTime()})}"
+                   class="uc-motion p-2 -ml-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg" title="Admin">
+                    <iconify-icon icon="solar:arrow-left-linear" class="text-2xl"></iconify-icon>
+                </a>
+                <div>
+                    <h2 class="text-2xl font-medium tracking-tight text-gray-900">Shut down application</h2>
+                    <p class="text-base font-normal text-gray-500 mt-1">Stops the production calling system process. Restart it from the desktop shortcut or service when needed.</p>
+                </div>
+            </div>
+
+            <div class="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-950 space-y-2">
+                <p class="font-semibold">This will exit the entire application.</p>
+                <p class="text-red-900/90">The dashboard and Modbus polling will stop until you start the app again. Signed-in admins only.</p>
+            </div>
+
+            <form th:action="@{/admin/shutdown}" method="post"
+                  class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden p-6 space-y-4">
+                <button type="submit"
+                        class="uc-motion inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-red-700 text-white rounded-lg hover:bg-red-800 text-sm font-medium">
+                    <iconify-icon icon="solar:power-linear" class="text-lg"></iconify-icon>
+                    Shut down now
+                </button>
+            </form>
+        </div>
+    </main>
+</div>
+</body>
+</html>

@@ -4,6 +4,11 @@
 -- Output relays: slave 2 uses channels 1–30 in order (first 10 workstations),
 --   then slave 3 uses channels 1–21 in order (remaining 7 workstations).
 -- Idempotent: skips if any workstation / slot already exists.
+-- Existing DBs: changing this file does not alter rows already in workstation_slot.
+-- One-time remap (old slave 2→3, then old 1→2) on SQLite, if you still see Slv:1 in admin:
+--   UPDATE workstation_slot SET output_slave_id = 3 WHERE output_slave_id = 2;
+--   UPDATE workstation_slot SET output_slave_id = 2 WHERE output_slave_id = 1;
+-- Or stop the app, delete the SQLite file under system.data-dir, and restart to re-seed.
 
 INSERT INTO workstation (name, sort_order, enabled)
 SELECT * FROM (
