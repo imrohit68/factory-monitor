@@ -17,7 +17,7 @@
 
     <main class="uc-page-enter">
         <div class="report-panel">
-            <h2>Download event log (CSV)</h2>
+            <h2>Download event log</h2>
             <form method="get" th:action="@{/report/export.csv}">
                 <div class="report-dates">
                     <label>Date from
@@ -30,7 +30,8 @@
                 </div>
                 <p class="report-warn" th:text="'Only for ' + ${maxRangeDays} + ' days max (inclusive).'">Range limit</p>
                 <div class="report-actions">
-                    <button class="btn-outline" type="submit">Download CSV</button>
+                    <button class="btn-outline" type="submit" th:formaction="@{/report/export.pdf}">Download PDF</button>
+                    <button class="btn-outline" type="submit" th:formaction="@{/report/export.csv}">Download CSV</button>
                 </div>
             </form>
         </div>

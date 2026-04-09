@@ -3,11 +3,24 @@ package com.example.system.service;
 import com.example.system.config.AppProperties;
 import com.example.system.domain.EventRecord;
 import com.example.system.repository.EventLogRepository;
+import com.lowagie.text.Chunk;
+import com.lowagie.text.Document;
+import com.lowagie.text.DocumentException;
+import com.lowagie.text.Element;
+import com.lowagie.text.Font;
+import com.lowagie.text.FontFactory;
+import com.lowagie.text.PageSize;
+import com.lowagie.text.Paragraph;
+import com.lowagie.text.Phrase;
+import com.lowagie.text.pdf.PdfPCell;
+import com.lowagie.text.pdf.PdfPTable;
+import com.lowagie.text.pdf.PdfWriter;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
 
+import java.awt.Color;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
@@ -16,12 +29,18 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.time.format.FormatStyle;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
 public class EventExportService {
+
+    private static final Color HEADER_BG = new Color(220, 220, 220);
+    private static final Color ROW_ALT = new Color(248, 248, 248);
+    private static final Locale PDF_LOCALE = Locale.ENGLISH;
 
     private final EventLogRepository events;
     private final AppProperties app;
@@ -36,11 +55,11 @@ public class EventExportService {
      * from {@link #validateRange}.
      */
     public void writeCsvAttachment(LocalDate start, LocalDate end, HttpServletResponse response) throws IOException {
-        validateRange(start, end);
+        List<EventRecord> rows = loadEventsInRange(start, end);
         String filename = String.format("event-log-%s-to-%s.csv", start, end);
         response.setContentType("text/csv; charset=UTF-8");
         response.setHeader(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"");
-        writeCsvContent(start, end, response.getOutputStream());
+        writeCsvBody(rows, response.getOutputStream());
         response.flushBuffer();
     }
 
@@ -48,17 +67,31 @@ public class EventExportService {
      * Writes CSV bytes to {@code out} for {@code [start, end]} (inclusive local dates). Validates range first.
      */
     public void writeCsv(LocalDate start, LocalDate end, OutputStream out) throws IOException {
-        validateRange(start, end);
-        writeCsvContent(start, end, out);
+        List<EventRecord> rows = loadEventsInRange(start, end);
+        writeCsvBody(rows, out);
     }
 
-    private void writeCsvContent(LocalDate start, LocalDate end, OutputStream out) throws IOException {
+    /**
+     * Writes event rows in {@code [start, end]} as a PDF table. Same data window and columns as CSV.
+     */
+    public void writePdfAttachment(LocalDate start, LocalDate end, HttpServletResponse response) throws IOException {
+        List<EventRecord> rows = loadEventsInRange(start, end);
+        String filename = String.format("event-log-%s-to-%s.pdf", start, end);
+        response.setContentType("application/pdf");
+        response.setHeader(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"");
+        writePdfBody(rows, start, end, response.getOutputStream());
+        response.flushBuffer();
+    }
+
+    private List<EventRecord> loadEventsInRange(LocalDate start, LocalDate end) {
+        validateRange(start, end);
         ZoneId z = ZoneId.systemDefault();
         Instant from = start.atStartOfDay(z).toInstant();
         Instant to = end.plusDays(1).atStartOfDay(z).toInstant();
-        List<EventRecord> rows =
-                events.findByEventTimeGreaterThanEqualAndEventTimeLessThanOrderByEventTimeAsc(from, to);
+        return events.findByEventTimeGreaterThanEqualAndEventTimeLessThanOrderByEventTimeAsc(from, to);
+    }
 
+    private void writeCsvBody(List<EventRecord> rows, OutputStream out) throws IOException {
         try (OutputStreamWriter w = new OutputStreamWriter(out, StandardCharsets.UTF_8)) {
             w.write('\uFEFF');
             w.write("id,mapping_id,input_bit_index,output_slave_id,output_channel,status,event_time\n");
@@ -79,6 +112,92 @@ public class EventExportService {
                 w.write('\n');
             }
         }
+    }
+
+    private void writePdfBody(List<EventRecord> rows, LocalDate start, LocalDate end, OutputStream out)
+            throws IOException {
+        Document document = new Document(PageSize.A4.rotate());
+        try {
+            PdfWriter.getInstance(document, out);
+            document.open();
+
+            Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 14f);
+            document.add(new Paragraph("Event log", titleFont));
+            Font subFont = FontFactory.getFont(FontFactory.HELVETICA, 10f);
+            Font periodLabelFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10f);
+            Phrase periodLine = new Phrase();
+            periodLine.add(new Chunk("Period: ", periodLabelFont));
+            periodLine.add(new Chunk(formatPdfPeriodLine(start, end), subFont));
+            document.add(new Paragraph(periodLine));
+            document.add(new Paragraph(" ", subFont));
+
+            Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8f);
+            Font cellFont = FontFactory.getFont(FontFactory.HELVETICA, 7.5f);
+
+            PdfPTable table = new PdfPTable(7);
+            table.setWidthPercentage(100);
+            table.setWidths(new float[] {0.65f, 0.95f, 0.85f, 0.95f, 0.95f, 0.75f, 2.9f});
+            table.setSpacingBefore(4f);
+
+            String[] headers = {
+                "ID",
+                "Mapping ID",
+                "Input bit",
+                "Output slave",
+                "Output channel",
+                "Status",
+                "Event time"
+            };
+            for (String h : headers) {
+                table.addCell(headerCell(h, headerFont));
+            }
+            table.setHeaderRows(1);
+
+            int i = 0;
+            for (EventRecord e : rows) {
+                Color bg = (i % 2 == 0) ? Color.WHITE : ROW_ALT;
+                table.addCell(dataCell(Long.toString(e.getId()), cellFont, bg));
+                table.addCell(
+                        dataCell(e.getMappingId() == null ? "" : Long.toString(e.getMappingId()), cellFont, bg));
+                table.addCell(dataCell(Integer.toString(e.getInputBitIndex()), cellFont, bg));
+                table.addCell(dataCell(Integer.toString(e.getOutputSlaveId()), cellFont, bg));
+                table.addCell(dataCell(Integer.toString(e.getOutputChannel()), cellFont, bg));
+                table.addCell(
+                        dataCell(e.getStatus() == null ? "" : e.getStatus().name(), cellFont, bg));
+                table.addCell(dataCell(formatUtcInstantToSeconds(e.getEventTime()), cellFont, bg));
+                i++;
+            }
+
+            document.add(table);
+        } catch (DocumentException e) {
+            throw new IOException("Failed to build PDF", e);
+        } finally {
+            document.close();
+        }
+    }
+
+    private static String formatPdfPeriodLine(LocalDate start, LocalDate end) {
+        DateTimeFormatter df = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(PDF_LOCALE);
+        return start.format(df) + " – " + end.format(df);
+    }
+
+    private static PdfPCell headerCell(String text, Font font) {
+        PdfPCell c = new PdfPCell(new Phrase(text, font));
+        c.setBackgroundColor(HEADER_BG);
+        c.setHorizontalAlignment(Element.ALIGN_CENTER);
+        c.setVerticalAlignment(Element.ALIGN_MIDDLE);
+        c.setPadding(6f);
+        c.setBorderWidth(0.5f);
+        return c;
+    }
+
+    private static PdfPCell dataCell(String text, Font font, Color background) {
+        PdfPCell c = new PdfPCell(new Phrase(text == null ? "" : text, font));
+        c.setBackgroundColor(background);
+        c.setVerticalAlignment(Element.ALIGN_MIDDLE);
+        c.setPadding(4f);
+        c.setBorderWidth(0.5f);
+        return c;
     }
 
     public void validateRange(LocalDate start, LocalDate end) {

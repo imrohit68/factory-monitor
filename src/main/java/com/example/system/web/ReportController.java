@@ -36,4 +36,17 @@ public class ReportController {
             response.sendError(HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
         }
     }
+
+    @GetMapping("/export.pdf")
+    public void exportPdf(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end,
+            HttpServletResponse response)
+            throws IOException {
+        try {
+            exportService.writePdfAttachment(start, end, response);
+        } catch (IllegalArgumentException e) {
+            response.sendError(HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
+        }
+    }
 }
