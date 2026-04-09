@@ -68,6 +68,8 @@ public class AudioFfmpegService {
         cmd.add("libmp3lame");
         cmd.add("-q:a");
         cmd.add("4");
+        cmd.add("-f");
+        cmd.add("mp3");
         cmd.add(targetMp3.toAbsolutePath().toString());
 
         ProcessBuilder pb = new ProcessBuilder(cmd);
