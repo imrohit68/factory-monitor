@@ -103,9 +103,9 @@
                                 </div>
                                 <p th:if="${form.id != null and form.currentEngAudioPath != null}" class="text-xs text-gray-500 mb-3" th:text="'Current: ' + ${form.currentEngAudioPath}"></p>
                                 <div class="space-y-2">
-                                    <label class="text-sm text-gray-600">Upload audio (MP3, M4A, WAV, OGG, AAC, …)</label>
+                                    <label class="text-sm text-gray-600">Upload audio (MP3, WAV, or OGG — OGG is converted to MP3 for the desktop app)</label>
                                     <input type="file" name="engAudioFile" id="ws-file-eng"
-                                           accept="audio/*,.mp3,.wav,.ogg,.oga,.opus,.m4a,.aac,.caf,.mp4,.webm,.flac,.wma,.aif,.aiff"
+                                           accept=".mp3,.wav,.ogg,audio/mpeg,audio/wav,audio/wave,audio/x-wav,audio/ogg,application/ogg"
                                            class="block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-medium"/>
                                 </div>
                             </div>
@@ -163,9 +163,9 @@
                                 </div>
                                 <p th:if="${form.id != null and form.currentLeadAudioPath != null}" class="text-xs text-gray-500 mb-3" th:text="'Current: ' + ${form.currentLeadAudioPath}"></p>
                                 <div class="space-y-2">
-                                    <label class="text-sm text-gray-600">Upload audio (MP3, M4A, WAV, OGG, AAC, …)</label>
+                                    <label class="text-sm text-gray-600">Upload audio (MP3, WAV, or OGG — OGG is converted to MP3 for the desktop app)</label>
                                     <input type="file" name="leadAudioFile" id="ws-file-lead"
-                                           accept="audio/*,.mp3,.wav,.ogg,.oga,.opus,.m4a,.aac,.caf,.mp4,.webm,.flac,.wma,.aif,.aiff"
+                                           accept=".mp3,.wav,.ogg,audio/mpeg,audio/wav,audio/wave,audio/x-wav,audio/ogg,application/ogg"
                                            class="block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-medium"/>
                                 </div>
                             </div>
@@ -223,9 +223,9 @@
                                 </div>
                                 <p th:if="${form.id != null and form.currentQcAudioPath != null}" class="text-xs text-gray-500 mb-3" th:text="'Current: ' + ${form.currentQcAudioPath}"></p>
                                 <div class="space-y-2">
-                                    <label class="text-sm text-gray-600">Upload audio (MP3, M4A, WAV, OGG, AAC, …)</label>
+                                    <label class="text-sm text-gray-600">Upload audio (MP3, WAV, or OGG — OGG is converted to MP3 for the desktop app)</label>
                                     <input type="file" name="qcAudioFile" id="ws-file-qc"
-                                           accept="audio/*,.mp3,.wav,.ogg,.oga,.opus,.m4a,.aac,.caf,.mp4,.webm,.flac,.wma,.aif,.aiff"
+                                           accept=".mp3,.wav,.ogg,audio/mpeg,audio/wav,audio/wave,audio/x-wav,audio/ogg,application/ogg"
                                            class="block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-medium"/>
                                 </div>
                             </div>
@@ -250,7 +250,7 @@
 <script>
     (function () {
         var objectUrls = { eng: null, lead: null, qc: null };
-        var AUDIO_EXT = /\.(mp3|wav|ogg|oga|opus|m4a|aac|caf|mp4|webm|flac|wma|aif|aiff|alac|m4b)$/i;
+        var AUDIO_EXT = /\.(mp3|wav|ogg)$/i;
 
         function revokeSlot(slot) {
             if (objectUrls[slot]) {
@@ -263,8 +263,9 @@
             if (!file) return true;
             var name = file.name || '';
             if (AUDIO_EXT.test(name)) return true;
-            var t = (file.type || '').toLowerCase();
-            return t.indexOf('audio/') === 0;
+            var t = (file.type || '').toLowerCase().split(';')[0].trim();
+            return t === 'audio/mpeg' || t === 'audio/mp3' || t === 'audio/wav' || t === 'audio/wave'
+                || t === 'audio/x-wav' || t === 'audio/ogg' || t === 'application/ogg';
         }
 
         function setPlayUi(btn, enabled) {
@@ -294,8 +295,7 @@
                 if (err && err.name === 'NotAllowedError') {
                     window.alert('Tap Play again — the browser required a click or tap on this page first.');
                 } else {
-                    window.alert(
-                        'Playback failed. If this is OGG or an uncommon format, try MP3 or WAV in this viewer.');
+                    window.alert('Playback failed. Use MP3, WAV, or OGG on the workstation form.');
                 }
             });
         };
@@ -309,7 +309,7 @@
             if (file) {
                 if (!isChosenFileAudio(file)) {
                     fileInput.value = '';
-                    window.alert('Please choose an audio file only (MP3, WAV, M4A, OGG, FLAC, …).');
+                    window.alert('Please choose an MP3, WAV, or OGG file only.');
                     file = null;
                 }
             }

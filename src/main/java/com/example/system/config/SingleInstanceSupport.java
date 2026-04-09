@@ -31,6 +31,8 @@ public final class SingleInstanceSupport {
     private static volatile boolean singleInstanceEnabled;
     private static volatile boolean desktopMode;
     private static volatile boolean desktopFullscreen = true;
+    /** When false, the JavaFX window close button does not exit the app (use Admin → Shut down). */
+    private static volatile boolean desktopAllowWindowClose = true;
     private static volatile int configuredPort = 8080;
     private static volatile int activationPort;
 
@@ -50,6 +52,14 @@ public final class SingleInstanceSupport {
      */
     public static boolean isDesktopFullscreen() {
         return desktopFullscreen;
+    }
+
+    /**
+     * When {@link #isDesktopMode()} is true, whether closing the JavaFX stage should stop Spring and exit the JVM.
+     * When false, the close request is ignored (operators exit via Admin → Shut down application).
+     */
+    public static boolean isDesktopAllowWindowClose() {
+        return desktopAllowWindowClose;
     }
 
     public static int getConfiguredPort() {
@@ -73,6 +83,7 @@ public final class SingleInstanceSupport {
         Properties defaults = loadClasspathApplicationProperties();
         desktopMode = resolveDesktopMode(defaults, args);
         desktopFullscreen = resolveDesktopFullscreen(defaults, args);
+        desktopAllowWindowClose = resolveDesktopAllowWindowClose(defaults, args);
         singleInstanceEnabled = resolveSingleInstance(defaults, args);
         configuredPort = resolvePort(defaults, args);
         activationPort = resolveActivationPort(defaults, args, configuredPort);
@@ -171,6 +182,17 @@ public final class SingleInstanceSupport {
                 argValue(args, "system.desktop-fullscreen"),
                 System.getProperty("system.desktop-fullscreen"),
                 defaults.getProperty("system.desktop-fullscreen"));
+        if (v == null || v.isBlank()) {
+            return true;
+        }
+        return Boolean.parseBoolean(v.trim());
+    }
+
+    private static boolean resolveDesktopAllowWindowClose(Properties defaults, String[] args) {
+        String v = firstNonBlank(
+                argValue(args, "system.desktop-allow-window-close"),
+                System.getProperty("system.desktop-allow-window-close"),
+                defaults.getProperty("system.desktop-allow-window-close"));
         if (v == null || v.isBlank()) {
             return true;
         }

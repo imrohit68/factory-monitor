@@ -57,7 +57,7 @@ if (Test-Path -LiteralPath $AppImageDir) {
 New-Item -ItemType Directory -Path $StageDir -Force | Out-Null
 
 $IconIco = Join-Path $PSScriptRoot "windows\app-icon.ico"
-# Packaged .exe: browser UI; stop via Admin → Shut down application.
+# Packaged .exe: JavaFX WebView UI; window close does not exit (Admin → Shut down application).
 $JpkgArgs = @(
     '--type', 'app-image',
     '--name', 'ProductionCallingSystem',
@@ -66,8 +66,9 @@ $JpkgArgs = @(
     '--main-class', 'org.springframework.boot.loader.launch.JarLauncher',
     '--dest', $StageDir,
     '--java-options', '-Dfile.encoding=UTF-8',
-    '--java-options', '-Dsystem.desktop-mode=false',
-    '--java-options', '-Dsystem.launch-browser=true',
+    '--java-options', '-Dsystem.desktop-mode=true',
+    '--java-options', '-Dsystem.launch-browser=false',
+    '--java-options', '-Dsystem.desktop-allow-window-close=false',
     '--app-version', '0.0.1'
 )
 if (Test-Path -LiteralPath $IconIco) {

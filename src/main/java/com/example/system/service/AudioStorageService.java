@@ -16,32 +16,26 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AudioStorageService {
 
-    private static final Set<String> ALLOWED_EXTENSIONS =
+    private static final Set<String> ALLOWED_EXTENSIONS = Set.of("mp3", "wav", "ogg");
+
+    private static final Set<String> ALLOWED_CONTENT_TYPES =
             Set.of(
-                    "mp3",
-                    "wav",
-                    "ogg",
-                    "oga",
-                    "opus",
-                    "m4a",
-                    "aac",
-                    "caf",
-                    "mp4",
-                    "webm",
-                    "flac",
-                    "wma",
-                    "aif",
-                    "aiff",
-                    "alac",
-                    "m4b");
+                    "audio/mpeg",
+                    "audio/mp3",
+                    "audio/wav",
+                    "audio/wave",
+                    "audio/x-wav",
+                    "audio/ogg",
+                    "application/ogg");
 
     private final AppProperties appProperties;
+    private final AudioFfmpegService audioFfmpegService;
 
     /**
-     * Saves the file under {@link AppProperties#getAudioUploadDir()} and returns a public URL path
-     * such as {@code /audio/uploads/<uuid>.mp3}, or null if empty.
+     * Saves alert audio under {@link AppProperties#getAudioUploadDir()} and returns a public URL path
+     * such as {@code /audio/uploads/<uuid>.mp3}. OGG uploads are transcoded to MP3 for JavaFX WebView playback.
      *
-     * @throws IOException if the file is not an allowed audio type
+     * @throws IOException if the file is not an allowed type or FFmpeg is required but fails
      */
     public String storeUpload(MultipartFile file) throws IOException {
         if (file == null || file.isEmpty()) {
@@ -52,37 +46,49 @@ public class AudioStorageService {
         String mime = file.getContentType();
         if (!isAllowedAudioUpload(extNoDot, mime)) {
             throw new IOException(
-                    "Only audio files are allowed (e.g. MP3, WAV, M4A, OGG, FLAC). "
-                            + "If your file is valid audio, convert or rename it to a standard extension.");
+                    "Only MP3, WAV, and OGG alert audio files are allowed. Convert other formats before uploading.");
         }
-        String ext = "";
-        if (original != null && original.contains(".")) {
-            ext = original.substring(original.lastIndexOf('.'));
-            if (ext.length() > 8) {
-                ext = "";
-            }
-        }
+        String extLower = extNoDot.toLowerCase(Locale.ROOT);
         Path dir = Path.of(appProperties.getAudioUploadDir()).toAbsolutePath().normalize();
         Files.createDirectories(dir);
-        String name = UUID.randomUUID() + ext;
-        Path dest = dir.resolve(name);
+        String id = UUID.randomUUID().toString();
+
+        if ("ogg".equals(extLower)) {
+            Path tempOgg = Files.createTempFile(dir, "upload-" + id + "-", ".ogg");
+            try {
+                file.transferTo(tempOgg);
+                Path mp3 = dir.resolve(id + ".mp3");
+                audioFfmpegService.transcodeToMp3(tempOgg, mp3);
+                return "/audio/uploads/" + id + ".mp3";
+            } finally {
+                try {
+                    Files.deleteIfExists(tempOgg);
+                } catch (IOException e) {
+                    // best-effort cleanup
+                }
+            }
+        }
+
+        String storedName = id + "." + extLower;
+        Path dest = dir.resolve(storedName);
         file.transferTo(dest);
-        return "/audio/uploads/" + name;
+        return "/audio/uploads/" + storedName;
     }
 
     static boolean isAllowedAudioUpload(String extensionWithoutDot, String contentType) {
-        if (extensionWithoutDot != null && !extensionWithoutDot.isBlank()) {
-            if (ALLOWED_EXTENSIONS.contains(extensionWithoutDot.toLowerCase(Locale.ROOT))) {
-                return true;
-            }
+        String ext = extensionWithoutDot != null ? extensionWithoutDot.toLowerCase(Locale.ROOT).trim() : "";
+        if (!ext.isEmpty()) {
+            return ALLOWED_EXTENSIONS.contains(ext);
         }
-        if (contentType != null && !contentType.isBlank()) {
-            String ct = contentType.toLowerCase(Locale.ROOT).trim();
-            if (ct.startsWith("audio/")) {
-                return true;
-            }
+        if (contentType == null || contentType.isBlank()) {
+            return false;
         }
-        return false;
+        String ct = contentType.toLowerCase(Locale.ROOT).trim();
+        int semi = ct.indexOf(';');
+        if (semi >= 0) {
+            ct = ct.substring(0, semi).trim();
+        }
+        return ALLOWED_CONTENT_TYPES.contains(ct);
     }
 
     private static String extensionWithoutDot(String originalFilename) {
@@ -93,10 +99,10 @@ public class AudioStorageService {
         if (dot < 0 || dot >= originalFilename.length() - 1) {
             return "";
         }
-        String ext = originalFilename.substring(dot + 1);
-        if (ext.length() > 8) {
+        String e = originalFilename.substring(dot + 1);
+        if (e.length() > 8) {
             return "";
         }
-        return ext;
+        return e;
     }
 }

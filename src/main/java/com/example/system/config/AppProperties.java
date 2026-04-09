@@ -55,6 +55,12 @@ public class AppProperties {
     @Getter(AccessLevel.NONE)
     private String audioUploadDir = "";
 
+    /**
+     * Path to the {@code ffmpeg} executable for OGG → MP3 conversion (desktop WebView and legacy {@code .ogg}
+     * URLs). If blank, {@code ffmpeg} must be on {@code PATH}.
+     */
+    private String audioFfmpegPath = "";
+
     public String getAudioUploadDir() {
         if (audioUploadDir != null && !audioUploadDir.isBlank()) {
             return audioUploadDir;

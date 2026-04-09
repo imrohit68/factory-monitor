@@ -24,8 +24,9 @@ import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Embeds the Spring Boot dashboard in a JavaFX {@link WebView}: dedicated window, quit on close, single-instance
- * re-launch focuses this window via {@link InstanceActivationServer}.
+ * Embeds the Spring Boot dashboard in a JavaFX {@link WebView}: dedicated window. Whether closing the window exits
+ * the JVM is controlled by {@link SingleInstanceSupport#isDesktopAllowWindowClose()}; when false, use Admin → Shut
+ * down application. Single-instance re-launch focuses this window via {@link InstanceActivationServer}.
  */
 public class FactoryMonitorDesktopApplication extends Application {
 
@@ -48,7 +49,11 @@ public class FactoryMonitorDesktopApplication extends Application {
         stage.setOnCloseRequest(
                 e -> {
                     e.consume();
-                    shutdown(stage);
+                    if (SingleInstanceSupport.isDesktopAllowWindowClose()) {
+                        shutdown(stage);
+                    } else {
+                        showCloseBlockedInfo();
+                    }
                 });
         applyDesktopFullscreen(stage);
         stage.show();
@@ -247,6 +252,16 @@ public class FactoryMonitorDesktopApplication extends Application {
         alert.setTitle("Production Calling System");
         alert.setHeaderText("Startup error");
         alert.setContentText(message != null ? message : "Unknown error");
+        alert.showAndWait();
+    }
+
+    private static void showCloseBlockedInfo() {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Production Calling System");
+        alert.setHeaderText("Window close disabled");
+        alert.setContentText(
+                "This kiosk session stays running. To stop the application, sign in as an admin and use "
+                        + "Admin → Shut down application.");
         alert.showAndWait();
     }
 }

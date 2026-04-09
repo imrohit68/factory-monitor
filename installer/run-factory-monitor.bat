@@ -80,13 +80,14 @@ set "SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE="
 REM ############################################################################
 REM Launch — Spring Boot accepts --property=value (same keys as application.properties)
 REM Quoted args below support spaces in paths and in passwords.
-REM Browser UI; app runs until stopped (Admin → Shut down application). For JavaFX window instead:
-REM   --system.desktop-mode=true --system.launch-browser=false
+REM JavaFX desktop window; close button does not exit (Admin → Shut down application). For browser UI instead:
+REM   --system.desktop-mode=false --system.launch-browser=true --system.desktop-allow-window-close=true
 REM ############################################################################
 
 set "APP_ARGS=--server.port=%SERVER_PORT%"
-set APP_ARGS=%APP_ARGS% --system.desktop-mode=false
-set APP_ARGS=%APP_ARGS% --system.launch-browser=true
+set APP_ARGS=%APP_ARGS% --system.desktop-mode=true
+set APP_ARGS=%APP_ARGS% --system.launch-browser=false
+set APP_ARGS=%APP_ARGS% --system.desktop-allow-window-close=false
 set APP_ARGS=%APP_ARGS% "--system.security.initial-username=%SYSTEM_SECURITY_INITIAL_USERNAME%"
 set APP_ARGS=%APP_ARGS% "--system.security.initial-password=%SYSTEM_SECURITY_INITIAL_PASSWORD%"
 set APP_ARGS=%APP_ARGS% "--system.data-dir=%SYSTEM_DATA_DIR%"
