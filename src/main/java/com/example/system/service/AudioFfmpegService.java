@@ -13,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -25,8 +26,12 @@ public class AudioFfmpegService {
     private static final Logger log = LoggerFactory.getLogger(AudioFfmpegService.class);
 
     private static final Object TRANSCODE_LOCK = new Object();
+    private static final Object DISCOVERY_LOCK = new Object();
 
     private final AppProperties appProperties;
+
+    /** When {@code system.audio-ffmpeg-path} is unset, first successful probe is cached for this JVM. */
+    private volatile String discoveredFfmpeg;
 
     /**
      * Converts any FFmpeg-readable input to MP3 (libmp3lame). Overwrites {@code targetMp3} if present.
@@ -50,7 +55,7 @@ public class AudioFfmpegService {
     }
 
     private void runFfmpegToMp3(Path source, Path targetMp3) throws IOException {
-        String ffmpeg = resolveFfmpegExecutable();
+        String ffmpeg = effectiveFfmpegExecutable();
         List<String> cmd = new ArrayList<>();
         cmd.add(ffmpeg);
         cmd.add("-y");
@@ -71,8 +76,12 @@ public class AudioFfmpegService {
         try {
             p = pb.start();
         } catch (IOException e) {
+            discoveredFfmpeg = null;
             throw new IOException(
-                    "Could not start FFmpeg ('" + ffmpeg + "'). Install FFmpeg or set system.audio-ffmpeg-path.", e);
+                    "Could not start FFmpeg ('"
+                            + ffmpeg
+                            + "'). Install FFmpeg or set system.audio-ffmpeg-path to the full path of the executable.",
+                    e);
         }
         try {
             boolean finished = p.waitFor(120, TimeUnit.SECONDS);
@@ -97,11 +106,94 @@ public class AudioFfmpegService {
         return new String(in.readAllBytes(), StandardCharsets.UTF_8);
     }
 
-    public String resolveFfmpegExecutable() {
+    /**
+     * Resolves FFmpeg: explicit {@code system.audio-ffmpeg-path}, else PATH {@code ffmpeg}, then common install
+     * locations (e.g. Homebrew on macOS). Caches the discovered path so IDE launches with a minimal PATH still
+     * work after the first successful probe.
+     */
+    private String effectiveFfmpegExecutable() throws IOException {
         String configured = appProperties.getAudioFfmpegPath();
         if (configured != null && !configured.isBlank()) {
-            return configured.trim();
+            String c = configured.trim();
+            if (!ffmpegVersionWorks(c)) {
+                throw new IOException(
+                        "system.audio-ffmpeg-path is set but FFmpeg did not run successfully: "
+                                + c
+                                + ". Check the path or install FFmpeg.");
+            }
+            return c;
         }
-        return "ffmpeg";
+        if (discoveredFfmpeg != null) {
+            return discoveredFfmpeg;
+        }
+        synchronized (DISCOVERY_LOCK) {
+            if (discoveredFfmpeg != null) {
+                return discoveredFfmpeg;
+            }
+            for (String candidate : defaultFfmpegCandidates()) {
+                if (ffmpegVersionWorks(candidate)) {
+                    discoveredFfmpeg = candidate;
+                    log.info("Using FFmpeg executable: {}", candidate);
+                    return candidate;
+                }
+            }
+        }
+        throw new IOException(
+                "FFmpeg not found (needed for OGG uploads). Install it and/or fix your PATH, or set "
+                        + "system.audio-ffmpeg-path. Examples: macOS: brew install ffmpeg (often "
+                        + "/opt/homebrew/bin/ffmpeg). Windows: winget install ffmpeg. "
+                        + "If you run from an IDE, add FFmpeg to PATH or set the full path in configuration.");
+    }
+
+    private static List<String> defaultFfmpegCandidates() {
+        List<String> list = new ArrayList<>();
+        list.add("ffmpeg");
+        String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+        if (os.contains("mac")) {
+            list.add("/opt/homebrew/bin/ffmpeg");
+            list.add("/usr/local/bin/ffmpeg");
+        }
+        if (os.contains("windows")) {
+            list.add("C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe");
+            list.add("C:\\ffmpeg\\bin\\ffmpeg.exe");
+        }
+        if (os.contains("linux")) {
+            list.add("/usr/bin/ffmpeg");
+        }
+        return list;
+    }
+
+    private static boolean ffmpegVersionWorks(String executable) {
+        try {
+            ProcessBuilder pb = new ProcessBuilder(executable, "-version");
+            pb.redirectErrorStream(true);
+            Process p = pb.start();
+            try {
+                boolean done = p.waitFor(8, TimeUnit.SECONDS);
+                if (!done) {
+                    p.destroyForcibly();
+                    return false;
+                }
+                return p.exitValue() == 0;
+            } finally {
+                drainQuietly(p.getInputStream());
+            }
+        } catch (IOException e) {
+            return false;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
+    private static void drainQuietly(InputStream in) {
+        if (in == null) {
+            return;
+        }
+        try {
+            in.readAllBytes();
+        } catch (IOException ignored) {
+            // ignore
+        }
     }
 }
