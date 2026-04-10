@@ -13,10 +13,12 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 @Service
@@ -211,7 +213,29 @@ public class WorkstationAdminService {
                         form.getQcRelay(),
                         qcAudio);
         workstationService.moveAfter(saved.getId(), form.getPlaceAfterWorkstationId());
+        if (!isNew) {
+            List<String> superseded = new ArrayList<>();
+            if (supersededAudioPath(prevE, engAudio.audioPath())) {
+                superseded.add(prevE);
+            }
+            if (supersededAudioPath(prevL, leadAudio.audioPath())) {
+                superseded.add(prevL);
+            }
+            if (supersededAudioPath(prevQ, qcAudio.audioPath())) {
+                superseded.add(prevQ);
+            }
+            audioStorageService.scheduleDeleteManagedUploadFilesIfUnreferencedAfterCommit(superseded);
+        }
         return Optional.empty();
+    }
+
+    private static boolean supersededAudioPath(String previous, String newPath) {
+        if (previous == null || previous.isBlank()) {
+            return false;
+        }
+        String p = previous.trim();
+        String n = newPath == null || newPath.isBlank() ? null : newPath.trim();
+        return !Objects.equals(p, n);
     }
 
     private SlotAudioPatch resolveSlotAudio(boolean clear, MultipartFile upload, String previousPath, boolean isNew)

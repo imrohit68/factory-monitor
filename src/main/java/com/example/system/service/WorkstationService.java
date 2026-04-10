@@ -14,9 +14,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 @Service
@@ -24,13 +26,18 @@ public class WorkstationService {
 
     private final WorkstationRepository workstationRepository;
     private final WorkstationSlotRepository slotRepository;
+    private final AudioStorageService audioStorageService;
 
     private final AtomicReference<List<WorkstationSlot>> orchestrationSlots =
             new AtomicReference<>(List.of());
 
-    public WorkstationService(WorkstationRepository workstationRepository, WorkstationSlotRepository slotRepository) {
+    public WorkstationService(
+            WorkstationRepository workstationRepository,
+            WorkstationSlotRepository slotRepository,
+            AudioStorageService audioStorageService) {
         this.workstationRepository = workstationRepository;
         this.slotRepository = slotRepository;
+        this.audioStorageService = audioStorageService;
     }
 
     @PostConstruct
@@ -69,8 +76,20 @@ public class WorkstationService {
 
     @Transactional
     public void deleteById(Long id) {
+        Optional<Workstation> existing = findByIdWithSlots(id);
+        Set<String> audioPathsToMaybeDelete = new LinkedHashSet<>();
+        existing.ifPresent(
+                w -> {
+                    for (WorkstationSlot s : w.getSlots()) {
+                        String p = s.getAudioPath();
+                        if (p != null && !p.isBlank()) {
+                            audioPathsToMaybeDelete.add(p.trim());
+                        }
+                    }
+                });
         workstationRepository.deleteById(id);
         refreshOrchestrationCache();
+        audioStorageService.scheduleDeleteManagedUploadFilesIfUnreferencedAfterCommit(audioPathsToMaybeDelete);
     }
 
     @Transactional

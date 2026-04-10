@@ -10,6 +10,8 @@ import java.util.Optional;
 
 public interface WorkstationSlotRepository extends JpaRepository<WorkstationSlot, Long> {
 
+    long countByAudioPath(String audioPath);
+
     @Query(
             "select s from WorkstationSlot s join fetch s.workstation w where w.enabled = true order by w.sortOrder asc, w.id asc, s.role asc")
     List<WorkstationSlot> findSlotsForOrchestration();

@@ -1,13 +1,20 @@
 package com.example.system.service;
 
 import com.example.system.config.AppProperties;
+import com.example.system.repository.WorkstationSlotRepository;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
@@ -15,6 +22,10 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class AudioStorageService {
+
+    private static final Logger log = LoggerFactory.getLogger(AudioStorageService.class);
+
+    private static final String UPLOAD_PUBLIC_PREFIX = "/audio/uploads/";
 
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of("mp3", "wav", "ogg");
 
@@ -30,6 +41,7 @@ public class AudioStorageService {
 
     private final AppProperties appProperties;
     private final AudioFfmpegService audioFfmpegService;
+    private final WorkstationSlotRepository workstationSlotRepository;
 
     /**
      * Saves alert audio under {@link AppProperties#getAudioUploadDir()} and returns a public URL path
@@ -89,6 +101,81 @@ public class AudioStorageService {
         Path dest = dir.resolve(storedName);
         file.transferTo(dest);
         return "/audio/uploads/" + storedName;
+    }
+
+    /**
+     * Deletes a file under the upload directory if {@code publicPath} is a managed {@code /audio/uploads/...} URL and
+     * no {@code workstation_slot} row still references that path.
+     */
+    public void deleteManagedUploadFileIfUnreferenced(String publicPath) {
+        if (publicPath == null || publicPath.isBlank()) {
+            return;
+        }
+        String normalized = publicPath.trim();
+        if (!isManagedUploadPublicPath(normalized)) {
+            return;
+        }
+        Path base = Path.of(appProperties.getAudioUploadDir()).toAbsolutePath().normalize();
+        String fileName = normalized.substring(UPLOAD_PUBLIC_PREFIX.length());
+        Path file = base.resolve(fileName).normalize();
+        if (!file.startsWith(base)) {
+            return;
+        }
+        if (workstationSlotRepository.countByAudioPath(normalized) > 0) {
+            return;
+        }
+        try {
+            Files.deleteIfExists(file);
+        } catch (IOException e) {
+            log.debug("Could not delete unreferenced upload {}: {}", file, e.getMessage());
+        }
+    }
+
+    /**
+     * After the current transaction commits, run {@link #deleteManagedUploadFileIfUnreferenced(String)} for each
+     * distinct path (typically superseded audio paths when a workstation slot was updated or cleared).
+     */
+    public void scheduleDeleteManagedUploadFilesIfUnreferencedAfterCommit(Collection<String> publicPaths) {
+        if (publicPaths == null || publicPaths.isEmpty()) {
+            return;
+        }
+        LinkedHashSet<String> unique = new LinkedHashSet<>();
+        for (String p : publicPaths) {
+            if (p != null && !p.isBlank()) {
+                unique.add(p.trim());
+            }
+        }
+        if (unique.isEmpty()) {
+            return;
+        }
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            log.warn("No active transaction; deleting unreferenced uploads immediately for {} path(s)", unique.size());
+            for (String p : unique) {
+                deleteManagedUploadFileIfUnreferenced(p);
+            }
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        for (String p : unique) {
+                            deleteManagedUploadFileIfUnreferenced(p);
+                        }
+                    }
+                });
+    }
+
+    static boolean isManagedUploadPublicPath(String publicPath) {
+        if (publicPath == null || !publicPath.startsWith(UPLOAD_PUBLIC_PREFIX)) {
+            return false;
+        }
+        String name = publicPath.substring(UPLOAD_PUBLIC_PREFIX.length());
+        if (name.isEmpty() || name.indexOf('/') >= 0 || name.indexOf('\\') >= 0 || name.contains("..")) {
+            return false;
+        }
+        String lower = name.toLowerCase(Locale.ROOT);
+        return lower.endsWith(".mp3") || lower.endsWith(".wav") || lower.endsWith(".ogg") || lower.endsWith(".oga");
     }
 
     static boolean isAllowedAudioUpload(String extensionWithoutDot, String contentType) {
