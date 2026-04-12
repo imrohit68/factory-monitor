@@ -192,10 +192,13 @@
                                     v-for="(ws, colIdx) in workstations"
                                     :key="'d-' + row.rowIdx + '-' + ws.id"
                                     class="matrix-cell group relative hover:z-[35] focus-within:z-[35]"
-                                    :class="{ 'cursor-pointer': mode === 'MAINTENANCE' }"
+                                    :class="[
+                                        ...cellClasses(ws, row.rowIdx),
+                                        { 'cursor-pointer': mode === 'MAINTENANCE' }
+                                    ]"
                                     @click="toggleSimulation(slotForRow(ws, row.rowIdx))">
                                 <div
-                                        :class="[...cellClasses(ws, row.rowIdx), 'matrix-cell__hit', 'w-full']"
+                                        class="matrix-cell__hit"
                                         :aria-label="cellAriaLabel(ws, row.rowIdx)"
                                         role="img"
                                         tabindex="-1"></div>

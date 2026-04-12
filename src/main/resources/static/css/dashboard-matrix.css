@@ -146,21 +146,37 @@ body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
     line-height: 1;
     color: #000;
 }
+/* Cell paint on <td> + a ::before layer that bleeds 1px past the content box on the right
+   (and slightly on other edges). Collapsed 5px borders in WebKit/JavaFX WebView often leave a
+   1px table-background “seam” between fill and border — extending the fill covers it. */
 .matrix-cell {
     position: relative;
     padding: 0 !important;
     min-height: clamp(2.5rem, 5vw, 3.75rem);
+    background: #d4d4d4;
+    isolation: isolate;
+}
+.matrix-cell::before {
+    content: "";
+    position: absolute;
+    top: -1px;
+    left: -1px;
+    right: -1px;
+    bottom: -1px;
+    z-index: 0;
+    pointer-events: none;
+    background: inherit;
 }
 .matrix-cell__hit {
+    position: relative;
+    z-index: 1;
     min-height: clamp(2.5rem, 5vw, 3.75rem);
     width: 100%;
+    background: transparent;
     transition: box-shadow 0.2s ease;
 }
 .matrix-cell__fill {
     box-sizing: border-box;
-    width: 100%;
-    height: 100%;
-    min-height: inherit;
 }
 /* Unlit / input low — neutral grey (#d4d4d4) for consistent appearance across displays. */
 .matrix-cell--off {
