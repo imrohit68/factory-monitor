@@ -40,66 +40,6 @@ body {
     border-bottom: 1px solid var(--nav-border);
 }
 
-/* Header speaker: vector icon with shake + emitting waves (no raster background) */
-.speaker-icon {
-    display: block;
-}
-
-.speaker-icon--playing .speaker-body {
-    transform-origin: 7px 12px;
-    animation: speaker-body-shake 0.38s ease-in-out infinite;
-}
-
-.speaker-icon--playing .speaker-wave {
-    transform-origin: 12px 12px;
-    animation: speaker-wave-emit 0.95s var(--uc-ease-soft) infinite;
-}
-
-.speaker-icon--playing .speaker-wave--outer {
-    animation-delay: 0.14s;
-}
-
-@keyframes speaker-body-shake {
-    0% {
-        transform: translateX(0) rotate(0deg);
-    }
-    25% {
-        transform: translateX(-0.45px) rotate(-2deg);
-    }
-    50% {
-        transform: translateX(0.6px) rotate(2.1deg);
-    }
-    75% {
-        transform: translateX(-0.35px) rotate(-1.4deg);
-    }
-    100% {
-        transform: translateX(0) rotate(0deg);
-    }
-}
-
-@keyframes speaker-wave-emit {
-    0% {
-        opacity: 0.2;
-        transform: scale(0.88);
-    }
-    45% {
-        opacity: 1;
-        transform: scale(1.03);
-    }
-    100% {
-        opacity: 0.15;
-        transform: scale(1.12);
-    }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .speaker-icon--playing .speaker-body,
-    .speaker-icon--playing .speaker-wave {
-        animation: none;
-        opacity: 1;
-        transform: none;
-    }
-}
 
 /* Smooth navigation / full-page views (Thymeleaf); respects reduced motion */
 html {
@@ -622,4 +562,9 @@ form.inline {
 
 .matrix-cell.on {
     box-shadow: inset 0 0 0 2px #0f172a;
+}
+
+/* Speaker icon frame animation uses <img src> swaps in JS (stable in JavaFX WebView). */
+.speaker-playing-icon {
+    display: block;
 }

@@ -25,6 +25,8 @@
         repeatEveryMs: repeatIntervalMin * 60 * 1000,
         maxAlertRepeats: parseAlertMaxRepeats(appEl)
     };
+    const SPEAKER_FRAME_COUNT = 26;
+    const SPEAKER_FRAME_MS = 70;
 
     const { createApp } = Vue;
 
@@ -84,8 +86,25 @@
                 /** Shown when alert audio could not start (browser autoplay policy). Cleared after first successful play(). */
                 showAudioGestureHint: false,
                 _refreshInFlight: false,
-                mode: 'PRODUCTION'
+                mode: 'PRODUCTION',
+                speakerFrameIndex: 0,
+                _speakerAnimTimer: null
             };
+        },
+        computed: {
+            speakerPlayingSrc() {
+                const idx = String(this.speakerFrameIndex).padStart(2, '0');
+                return '/images/speaker-frame-' + idx + '.png';
+            }
+        },
+        watch: {
+            playingKey(nextKey) {
+                if (nextKey != null) {
+                    this.startSpeakerAnimation();
+                    return;
+                }
+                this.stopSpeakerAnimation();
+            }
         },
         mounted() {
             this.refresh();
@@ -125,6 +144,7 @@
         },
         beforeUnmount() {
             console.log('Component unmounting');
+            this.stopSpeakerAnimation();
             this.stopAlertAudio();
             if (this._pollInterval) {
                 clearInterval(this._pollInterval);
@@ -146,6 +166,22 @@
             }
         },
         methods: {
+            startSpeakerAnimation() {
+                if (this._speakerAnimTimer != null) {
+                    return;
+                }
+                this.speakerFrameIndex = 0;
+                this._speakerAnimTimer = setInterval(() => {
+                    this.speakerFrameIndex = (this.speakerFrameIndex + 1) % SPEAKER_FRAME_COUNT;
+                }, SPEAKER_FRAME_MS);
+            },
+            stopSpeakerAnimation() {
+                if (this._speakerAnimTimer != null) {
+                    clearInterval(this._speakerAnimTimer);
+                    this._speakerAnimTimer = null;
+                }
+                this.speakerFrameIndex = 0;
+            },
             slotForRow(ws, rowIdx) {
                 const slots = ws.slots || [];
                 if (slots.length !== 3) return null;
