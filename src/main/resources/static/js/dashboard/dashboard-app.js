@@ -27,6 +27,8 @@
     };
     const SPEAKER_FRAME_COUNT = 26;
     const SPEAKER_FRAME_MS = 70;
+    /** Survives refresh and new tabs so a continuous ON is not treated as a new alert after navigation. */
+    const DASHBOARD_ALERT_ACTIVATION_KEY = 'dashboard-alert-activation-v1';
 
     const { createApp } = Vue;
 
@@ -79,6 +81,8 @@
                 _replayTimerByKey: {},
                 // Number of repeats already queued/played per active key (resets on OFF->ON).
                 _replayCountByKey: {},
+                /** Mirrors activation snapshot when localStorage is unavailable (e.g. JavaFX WebView). */
+                _activationSnapshotMemory: {},
                 _pollInterval: null,
                 _visibilityHandler: null,
                 _beforeUnloadHandler: null,
@@ -297,7 +301,11 @@
                             out.push({
                                 key: String(slot.slotId),
                                 url: slot.audioUrl,
-                                bit: slot.inputBitIndex
+                                bit: slot.inputBitIndex,
+                                activationId:
+                                    slot.openEventId == null || slot.openEventId === undefined
+                                        ? null
+                                        : String(slot.openEventId)
                             });
                         }
                     }
@@ -410,6 +418,78 @@
                     clearTimeout(this._repeatTimer);
                     this._repeatTimer = null;
                 }
+            },
+            readPersistedActivationSnapshot() {
+                const mem = this._activationSnapshotMemory && typeof this._activationSnapshotMemory === 'object'
+                    ? this._activationSnapshotMemory
+                    : {};
+                let fromDisk = {};
+                if (typeof window !== 'undefined' && window.localStorage) {
+                    try {
+                        const raw = window.localStorage.getItem(DASHBOARD_ALERT_ACTIVATION_KEY);
+                        if (raw) {
+                            const parsed = JSON.parse(raw);
+                            const byKey = parsed && typeof parsed === 'object' ? parsed.byKey : null;
+                            if (byKey && typeof byKey === 'object') {
+                                for (const [k, v] of Object.entries(byKey)) {
+                                    if (!v || typeof v !== 'object') continue;
+                                    fromDisk[String(k)] = {
+                                        url: this.normalizeAudioUrl(v.url),
+                                        activationId:
+                                            v.activationId == null || v.activationId === ''
+                                                ? null
+                                                : String(v.activationId)
+                                    };
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('Failed to read dashboard alert activation snapshot:', e);
+                    }
+                }
+                if (Object.keys(fromDisk).length > 0) {
+                    return Object.assign({}, mem, fromDisk);
+                }
+                return Object.assign({}, mem);
+            },
+            writePersistedActivationSnapshot(byKey) {
+                const normalized = {};
+                for (const [rawKey, v] of Object.entries(byKey || {})) {
+                    if (!v || typeof v !== 'object') continue;
+                    normalized[String(rawKey)] = {
+                        url: this.normalizeAudioUrl(v.url),
+                        activationId: v.activationId == null ? null : String(v.activationId)
+                    };
+                }
+                this._activationSnapshotMemory = normalized;
+                if (typeof window === 'undefined' || !window.localStorage) {
+                    return;
+                }
+                try {
+                    window.localStorage.setItem(
+                        DASHBOARD_ALERT_ACTIVATION_KEY,
+                        JSON.stringify({ byKey: normalized })
+                    );
+                } catch (e) {
+                    console.warn('Failed to write dashboard alert activation snapshot:', e);
+                }
+            },
+            sameActivationPersisted(persistedEntry, item) {
+                if (!persistedEntry || !item) {
+                    return false;
+                }
+                if (this.normalizeAudioUrl(persistedEntry.url) !== this.normalizeAudioUrl(item.url)) {
+                    return false;
+                }
+                const a = item.activationId == null ? null : String(item.activationId);
+                const b = persistedEntry.activationId;
+                if (a != null && b != null) {
+                    return a === b;
+                }
+                if (a == null && b == null) {
+                    return true;
+                }
+                return false;
             },
             playlistSignature(pl) {
                 // Used to detect whether the "active audio set" has changed.
@@ -565,7 +645,11 @@
                         return {
                             key,
                             url: slot.audioUrl,
-                            bit: slot.inputBitIndex
+                            bit: slot.inputBitIndex,
+                            activationId:
+                                slot.openEventId == null || slot.openEventId === undefined
+                                    ? null
+                                    : String(slot.openEventId)
                         };
                     }
                 }
@@ -636,12 +720,13 @@
                 const pl = this.buildActiveAudioPlaylist(workstations);
                 if (pl.length === 0) {
                     console.log('No active audio, stopping playback');
+                    this.writePersistedActivationSnapshot({});
                     this.stopAlertAudio();
                     return;
                 }
 
-                // Detect per-key transitions so each OFF->ON reset plays immediately.
-                const prevActiveByKey = this._activeAudioByKey || {};
+                // Use a persisted snapshot so refresh / new tab / route return does not look like OFF->ON again.
+                const prevPersisted = this.readPersistedActivationSnapshot();
                 const activeByKey = {};
                 const activeNowSet = new Set();
                 for (const item of pl) {
@@ -659,7 +744,7 @@
                 }
 
                 // OFF transitions: cancel any scheduled replay timer for that key.
-                for (const key of Object.keys(prevActiveByKey)) {
+                for (const key of Object.keys(prevPersisted)) {
                     if (activeNowSet.has(key)) continue;
                     if (this._replayTimerByKey[key] != null) {
                         clearTimeout(this._replayTimerByKey[key]);
@@ -669,9 +754,9 @@
                     delete this._queuedKeys[key];
                 }
 
-                // ON transitions: enqueue immediate playback for newly active keys.
+                // ON transitions: enqueue immediate playback for newly active keys (new activation or new URL).
                 for (const item of pl) {
-                    const wasActive = !!prevActiveByKey[item.key];
+                    const wasActive = this.sameActivationPersisted(prevPersisted[item.key], item);
                     if (wasActive) continue;
 
                     // If a timer exists (e.g., due to timing races), clear it; new timer starts after this playback ends.
@@ -687,6 +772,15 @@
                     this._playQueue.push(item);
                     this._queuedKeys[item.key] = true;
                 }
+
+                const nextPersisted = {};
+                for (const item of pl) {
+                    nextPersisted[item.key] = {
+                        url: this.normalizeAudioUrl(item.url),
+                        activationId: item.activationId == null ? null : String(item.activationId)
+                    };
+                }
+                this.writePersistedActivationSnapshot(nextPersisted);
 
                 // Deterministic ordering: by bit then key.
                 if (this._playQueue.length) {

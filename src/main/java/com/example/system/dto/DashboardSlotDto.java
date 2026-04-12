@@ -9,4 +9,6 @@ public record DashboardSlotDto(
         int outputSlaveId,
         int outputChannel,
         boolean active,
+        /** Present while {@code active}; identifies this physical ON episode for dashboard clients. */
+        Long openEventId,
         String audioUrl) {}

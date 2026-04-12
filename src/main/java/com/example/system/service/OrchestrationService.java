@@ -149,6 +149,7 @@ public class OrchestrationService {
                                 s.getOutputSlaveId(),
                                 s.getOutputChannel(),
                                 active,
+                                active ? openEventIdsBySlotId.get(s.getId()) : null,
                                 audioUrl));
             }
             out.add(
