@@ -1,5 +1,6 @@
 package com.example.system.service;
 
+import com.example.system.config.ApplicationOperationMode;
 import com.example.system.config.AppProperties;
 import com.example.system.config.ModbusProperties;
 import com.example.system.domain.WorkstationSlot;
@@ -27,7 +28,9 @@ public class OrchestrationService {
 
     private final ModbusProperties modbus;
     private final ModbusMasterService modbusMaster;
+    private final ApplicationOperationMode applicationOperationMode;
     private final EventPersistenceService persistence;
+    private final SimulationInputService simulationInputService;
     private final WorkstationService workstationService;
     private final AppProperties appProperties;
 
@@ -37,12 +40,16 @@ public class OrchestrationService {
     public OrchestrationService(
             ModbusProperties modbus,
             ModbusMasterService modbusMaster,
+            ApplicationOperationMode applicationOperationMode,
             EventPersistenceService persistence,
+            SimulationInputService simulationInputService,
             WorkstationService workstationService,
             AppProperties appProperties) {
         this.modbus = modbus;
         this.modbusMaster = modbusMaster;
+        this.applicationOperationMode = applicationOperationMode;
         this.persistence = persistence;
+        this.simulationInputService = simulationInputService;
         this.workstationService = workstationService;
         this.appProperties = appProperties;
     }
@@ -56,7 +63,10 @@ public class OrchestrationService {
         }
         int maxBit = slots.stream().mapToInt(WorkstationSlot::getInputBitIndex).max().orElse(0);
         int bitCount = Math.max(modbus.getInputRegisterCount() * 16, maxBit + 1);
-        boolean[] bits = modbusMaster.readInputBits(bitCount);
+        boolean[] bits =
+                applicationOperationMode.isMaintenanceMode()
+                        ? simulationInputService.readBits(bitCount)
+                        : modbusMaster.readInputBits(bitCount);
 
         Set<Long> activeSlotIds = Set.copyOf(slots.stream().map(WorkstationSlot::getId).toList());
         channelBySlotId.keySet().removeIf(id -> !activeSlotIds.contains(id));
@@ -165,6 +175,7 @@ public class OrchestrationService {
         body.put("workstations", buildDashboardWorkstations());
         body.put("modbusConnected", isModbusConnected());
         body.put("modbusError", getModbusLastError());
+        body.put("mode", applicationOperationMode.getCurrentMode().name());
         body.put("alertRepeatIntervalMinutes", appProperties.getDashboardAlertRepeatIntervalMinutes());
         body.put("alertMaxRepeats", appProperties.getDashboardAlertMaxRepeats());
         return body;

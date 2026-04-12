@@ -33,6 +33,7 @@ public final class SingleInstanceSupport {
     private static volatile boolean desktopFullscreen = true;
     /** When false, the JavaFX window close button does not exit the app (use Admin → Shut down). */
     private static volatile boolean desktopAllowWindowClose = true;
+    private static volatile OperationMode operationModeOverride;
     private static volatile int configuredPort = 8080;
     private static volatile int activationPort;
 
@@ -60,6 +61,14 @@ public final class SingleInstanceSupport {
      */
     public static boolean isDesktopAllowWindowClose() {
         return desktopAllowWindowClose;
+    }
+
+    public static OperationMode getOperationModeOverride() {
+        return operationModeOverride;
+    }
+
+    public static void setOperationMode(OperationMode operationMode) {
+        operationModeOverride = operationMode;
     }
 
     public static int getConfiguredPort() {

@@ -1,22 +1,33 @@
 package com.example.system.desktop;
 
 import com.example.system.MonitorApplication;
+import com.example.system.config.OperationMode;
 import com.example.system.config.SingleInstanceSupport;
 import javafx.application.Application;
 import javafx.application.Platform;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
+import javafx.scene.control.Label;
 import javafx.scene.image.Image;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.CycleMethod;
 import javafx.scene.paint.LinearGradient;
 import javafx.scene.paint.Stop;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
 import javafx.concurrent.Worker;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.web.WebView;
+import javafx.stage.Modality;
 import javafx.stage.Stage;
+import javafx.stage.StageStyle;
 import netscape.javascript.JSObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,9 +44,9 @@ import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Embeds the Spring Boot dashboard in a JavaFX {@link WebView}: dedicated window. Whether closing the window exits
- * the JVM is controlled by {@link SingleInstanceSupport#isDesktopAllowWindowClose()}; when false, the close
- * request is ignored and an informational dialog explains that admins must use Admin → Shut down application.
+ * Embeds the Spring Boot dashboard in a JavaFX {@link WebView}: dedicated window. The window close (✕) button does
+ * not exit the app; it shows an instruction to shut down from the admin panel. Use Admin → Shut down application
+ * to stop the JVM.
  * Press F11 to toggle fullscreen after Esc exits it. Single-instance re-launch focuses this window via
  * {@link InstanceActivationServer}.
  */
@@ -51,24 +62,27 @@ public class FactoryMonitorDesktopApplication extends Application {
         String[] args = getParameters().getRaw().toArray(String[]::new);
         int httpPort = SingleInstanceSupport.getConfiguredPort();
         int activationPort = SingleInstanceSupport.getActivationPort();
+        OperationMode selectedMode = showModeSelectionDialog(stage);
+        if (selectedMode == null) {
+            // If the chooser is dismissed, continue with the safe default instead of leaving the desktop shell half-open.
+            selectedMode = OperationMode.PRODUCTION;
+        }
+        SingleInstanceSupport.setOperationMode(selectedMode);
+        log.info("Starting application in {} mode", selectedMode.name());
 
         String windowTitle = resolveWindowTitle();
         stage.setTitle(windowTitle);
         applyStageIcon(stage);
         WebView webView = new WebView();
         webView.setStyle("-fx-background-color: transparent;");
-        webView.getEngine().loadContent(buildSplashHtml(windowTitle));
+        webView.getEngine().loadContent(buildSplashHtml(windowTitle, selectedMode.getDisplayName()));
         Scene scene = new Scene(new StackPane(webView), 1280, 800);
         scene.setFill(splashSceneFill());
         stage.setScene(scene);
         stage.setOnCloseRequest(
                 e -> {
                     e.consume();
-                    if (SingleInstanceSupport.isDesktopAllowWindowClose()) {
-                        shutdown(stage);
-                    } else {
-                        showCloseBlockedHint();
-                    }
+                    showCloseInstructionDialog();
                 });
         installDesktopChrome(scene, stage, webView, httpPort);
         applyDesktopFullscreen(stage);
@@ -127,7 +141,94 @@ public class FactoryMonitorDesktopApplication extends Application {
                 new Stop(1, Color.web("#0d2137")));
     }
 
-    private static String buildSplashHtml(String appTitle) {
+    private OperationMode showModeSelectionDialog(Stage ownerStage) {
+        Stage dialog = new Stage(StageStyle.TRANSPARENT);
+        dialog.initModality(Modality.APPLICATION_MODAL);
+        dialog.initOwner(ownerStage);
+        dialog.setTitle("Select Mode");
+        dialog.setResizable(false);
+        applyStageIcon(dialog);
+
+        Label title = new Label("Select Mode");
+        title.setFont(Font.font("System", FontWeight.BOLD, 22));
+        title.setTextFill(Color.web("#e8eef7"));
+
+        Label subtitle = new Label("Choose how to run the application");
+        subtitle.setFont(Font.font("System", FontWeight.NORMAL, 13));
+        subtitle.setTextFill(Color.web("#8fa3bf"));
+
+        VBox productionCard = buildModeCard(
+                "Production Mode",
+                "Connect to Modbus hardware.\nReads inputs from the physical device.",
+                "#10b981",
+                "#065f46");
+        VBox maintenanceCard = buildModeCard(
+                "Maintenance Mode",
+                "No hardware required.\nToggle inputs from the dashboard grid.",
+                "#8b5cf6",
+                "#4c1d95");
+
+        final OperationMode[] selected = {null};
+        productionCard.setOnMouseClicked(
+                e -> {
+                    selected[0] = OperationMode.PRODUCTION;
+                    dialog.close();
+                });
+        maintenanceCard.setOnMouseClicked(
+                e -> {
+                    selected[0] = OperationMode.MAINTENANCE;
+                    dialog.close();
+                });
+
+        HBox cards = new HBox(24, productionCard, maintenanceCard);
+        cards.setAlignment(Pos.CENTER);
+
+        VBox root = new VBox(16, title, subtitle, cards);
+        root.setAlignment(Pos.CENTER);
+        root.setPadding(new Insets(40, 48, 40, 48));
+        root.setStyle(
+                "-fx-background-color: linear-gradient(to bottom right, #0f1419, #1a2744, #0d2137);"
+                        + "-fx-background-radius: 12; -fx-border-radius: 12;"
+                        + "-fx-border-color: rgba(255,255,255,0.08); -fx-border-width: 1;");
+
+        Scene scene = new Scene(root);
+        scene.setFill(Color.TRANSPARENT);
+        dialog.setScene(scene);
+        dialog.showAndWait();
+        return selected[0];
+    }
+
+    private static VBox buildModeCard(String titleText, String bodyText, String accent, String accentDark) {
+        Label title = new Label(titleText);
+        title.setFont(Font.font("System", FontWeight.BOLD, 18));
+        title.setTextFill(Color.web("#f8fbff"));
+
+        Label body = new Label(bodyText);
+        body.setWrapText(true);
+        body.setTextFill(Color.web("#c7d4e6"));
+        body.setFont(Font.font("System", FontWeight.NORMAL, 13));
+
+        Region accentBar = new Region();
+        accentBar.setPrefSize(56, 4);
+        accentBar.setMaxWidth(56);
+        accentBar.setStyle("-fx-background-color: " + accent + "; -fx-background-radius: 999;");
+
+        VBox card = new VBox(14, accentBar, title, body);
+        card.setAlignment(Pos.TOP_LEFT);
+        card.setPadding(new Insets(22));
+        card.setPrefWidth(260);
+        card.setMinWidth(260);
+        card.setStyle(
+                "-fx-background-color: linear-gradient(to bottom right, rgba(255,255,255,0.07), rgba(255,255,255,0.03));"
+                        + "-fx-background-radius: 14; -fx-border-radius: 14;"
+                        + "-fx-border-color: "
+                        + accentDark
+                        + "; -fx-border-width: 1.2;"
+                        + "-fx-cursor: hand;");
+        return card;
+    }
+
+    private static String buildSplashHtml(String appTitle, String modeLabel) {
         String logoImg = "";
         byte[] logoBytes = readClasspathLogoPngBytes();
         if (logoBytes != null && logoBytes.length > 0) {
@@ -159,7 +260,9 @@ public class FactoryMonitorDesktopApplication extends Application {
                 + "<h1>"
                 + escapeHtml(appTitle)
                 + "</h1>"
-                + "<p class=\"sub\">Starting…</p>"
+                + "<p class=\"sub\">Starting in "
+                + escapeHtml(modeLabel)
+                + "…</p>"
                 + "<div class=\"spinner\" role=\"status\" aria-label=\"Loading\"></div>"
                 + "</body></html>";
     }
@@ -371,13 +474,12 @@ public class FactoryMonitorDesktopApplication extends Application {
         alert.showAndWait();
     }
 
-    private static void showCloseBlockedHint() {
+    private static void showCloseInstructionDialog() {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
         alert.setTitle("Production Calling System");
-        alert.setHeaderText("Window close disabled");
+        alert.setHeaderText(null);
         alert.setContentText(
-                "This session stays running. To stop the application, sign in as an admin and use "
-                        + "Admin → Shut down application.");
+                "To close the application, please login to the admin panel and choose Shut Down Application.");
         alert.showAndWait();
     }
 }

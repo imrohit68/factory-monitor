@@ -55,7 +55,9 @@ public class SecurityConfig {
                         .permitAll())
                 .headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin))
                 .csrf(csrf -> csrf.ignoringRequestMatchers(
-                        "/admin/workstations/audio-preview", "/admin/workstations/audio-preview/**"));
+                        "/admin/workstations/audio-preview",
+                        "/admin/workstations/audio-preview/**",
+                        "/api/dashboard/simulation/toggle/**"));
         return http.build();
     }
 }

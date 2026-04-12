@@ -83,7 +83,8 @@
                 _gestureResumeAudio: null,
                 /** Shown when alert audio could not start (browser autoplay policy). Cleared after first successful play(). */
                 showAudioGestureHint: false,
-                _refreshInFlight: false
+                _refreshInFlight: false,
+                mode: 'PRODUCTION'
             };
         },
         mounted() {
@@ -237,6 +238,19 @@
                 const rowTone =
                     rowIdx === 0 ? 'matrix-cell--e' : rowIdx === 1 ? 'matrix-cell--l' : 'matrix-cell--q';
                 return base.concat([rowTone]);
+            },
+            async toggleSimulation(slot) {
+                if (this.mode !== 'MAINTENANCE' || !slot || !slot.slotId) return;
+                try {
+                    const res = await fetch('/api/dashboard/simulation/toggle/' + slot.slotId, { method: 'POST' });
+                    if (!res.ok) {
+                        console.warn('Simulation toggle failed:', res.status);
+                        return;
+                    }
+                    await this.refresh();
+                } catch (e) {
+                    console.error('Simulation toggle error:', e);
+                }
             },
             buildActiveAudioPlaylist(workstations) {
                 const out = [];
@@ -642,6 +656,9 @@
                     const next = j.workstations || [];
                     console.log('Dashboard refresh:', next.length, 'workstations');
                     this.workstations = next;
+                    if (j.mode) {
+                        this.mode = j.mode;
+                    }
 
                     if (typeof j.alertRepeatIntervalMinutes === 'number' && j.alertRepeatIntervalMinutes > 0) {
                         this.repeatEveryMs = j.alertRepeatIntervalMinutes * 60 * 1000;

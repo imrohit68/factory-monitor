@@ -138,10 +138,15 @@
     <main class="uc-page-enter flex-1 w-full max-w-[1920px] mx-auto p-4 md:p-6 lg:p-8 flex flex-col gap-6 lg:gap-8 overflow-y-auto min-h-0">
 
         <div class="shrink-0 flex justify-center px-2 pt-1 pb-2 md:pt-2 md:pb-3 w-full min-w-0 overflow-x-auto">
-            <p class="dashboard-project-title text-center font-bold uppercase tracking-[0.12em] leading-tight"
-               aria-label="Production Calling System">
-                Production Calling System
-            </p>
+            <div class="flex flex-col items-center gap-2 text-center">
+                <p class="dashboard-project-title text-center font-bold uppercase tracking-[0.12em] leading-tight"
+                   aria-label="Production Calling System">
+                    Production Calling System
+                </p>
+                <span class="inline-flex items-center rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-semibold tracking-[0.08em] text-gray-700 shadow-sm">
+                    {{ mode === 'MAINTENANCE' ? 'Maintenance Mode' : 'Production Mode' }}
+                </span>
+            </div>
         </div>
 
         <div v-if="workstations.length === 0" class="flex flex-col items-center justify-center py-16 text-center text-gray-500 gap-3">
@@ -186,7 +191,9 @@
                             <td
                                     v-for="(ws, colIdx) in workstations"
                                     :key="'d-' + row.rowIdx + '-' + ws.id"
-                                    class="matrix-cell group relative hover:z-[35] focus-within:z-[35]">
+                                    class="matrix-cell group relative hover:z-[35] focus-within:z-[35]"
+                                    :class="{ 'cursor-pointer': mode === 'MAINTENANCE' }"
+                                    @click="toggleSimulation(slotForRow(ws, row.rowIdx))">
                                 <div
                                         :class="[...cellClasses(ws, row.rowIdx), 'matrix-cell__hit', 'w-full']"
                                         :aria-label="cellAriaLabel(ws, row.rowIdx)"

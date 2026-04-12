@@ -1,5 +1,6 @@
 package com.example.system.service;
 
+import com.example.system.config.ApplicationOperationMode;
 import com.example.system.domain.EventRecord;
 import com.example.system.domain.EventStatus;
 import com.example.system.repository.EventLogRepository;
@@ -14,6 +15,7 @@ import java.time.Instant;
 public class EventPersistenceService {
 
     private final EventLogRepository events;
+    private final ApplicationOperationMode applicationOperationMode;
 
     @Transactional
     public Long openEvent(long mappingId, int inputBitIndex, int outputSlaveId, int outputChannel) {
@@ -23,6 +25,7 @@ public class EventPersistenceService {
         e.setOutputSlaveId(outputSlaveId);
         e.setOutputChannel(outputChannel);
         e.setStatus(EventStatus.OPEN);
+        e.setMode(applicationOperationMode.getCurrentMode());
         e.setEventTime(Instant.now());
         return events.save(e).getId();
     }
@@ -38,6 +41,7 @@ public class EventPersistenceService {
         e.setOutputSlaveId(outputSlaveId);
         e.setOutputChannel(outputChannel);
         e.setStatus(EventStatus.CLOSED);
+        e.setMode(applicationOperationMode.getCurrentMode());
         e.setEventTime(Instant.now());
         return events.save(e).getId();
     }

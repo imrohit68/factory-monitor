@@ -1,6 +1,8 @@
 package com.example.system.service;
 
+import com.example.system.config.ApplicationOperationMode;
 import com.example.system.config.AppProperties;
+import com.example.system.config.OperationMode;
 import com.example.system.domain.EventRecord;
 import com.example.system.repository.EventLogRepository;
 import com.lowagie.text.Chunk;
@@ -46,6 +48,7 @@ public class EventExportService {
 
     private final EventLogRepository events;
     private final AppProperties app;
+    private final ApplicationOperationMode applicationOperationMode;
 
     /**
      * Writes all {@code event_log} rows with {@code event_time} in the inclusive local date range
@@ -92,14 +95,19 @@ public class EventExportService {
         ZoneId z = ZoneId.systemDefault();
         Instant from = start.atStartOfDay(z).toInstant();
         Instant to = end.plusDays(1).atStartOfDay(z).toInstant();
-        return events.findByEventTimeGreaterThanEqualAndEventTimeLessThanOrderByEventTimeAsc(from, to);
+        OperationMode mode = applicationOperationMode.getCurrentMode();
+        return events.findByEventTimeRangeAndModeOrderByEventTimeAsc(
+                from,
+                to,
+                mode,
+                mode == OperationMode.PRODUCTION);
     }
 
     private void writeCsvBody(List<EventRecord> rows, OutputStream out) throws IOException {
         ZoneId zone = ZoneId.systemDefault();
         try (OutputStreamWriter w = new OutputStreamWriter(out, StandardCharsets.UTF_8)) {
             w.write('\uFEFF');
-            w.write("id,mapping_id,input_bit_index,output_slave_id,output_channel,status,event_date,event_time\n");
+            w.write("id,mapping_id,input_bit_index,output_slave_id,output_channel,status,mode,event_date,event_time\n");
             for (EventRecord e : rows) {
                 w.write(Long.toString(e.getId()));
                 w.write(',');
@@ -112,6 +120,8 @@ public class EventExportService {
                 w.write(Integer.toString(e.getOutputChannel()));
                 w.write(',');
                 w.write(escapeCsv(e.getStatus() == null ? "" : e.getStatus().name()));
+                w.write(',');
+                w.write(escapeCsv(e.getMode() == null ? "" : e.getMode().name()));
                 w.write(',');
                 appendCsvEventDateTime(e.getEventTime(), zone, w);
                 w.write('\n');
@@ -169,9 +179,9 @@ public class EventExportService {
             Font cellFont = FontFactory.getFont(FontFactory.HELVETICA, 7.5f);
 
             ZoneId zone = ZoneId.systemDefault();
-            PdfPTable table = new PdfPTable(8);
+            PdfPTable table = new PdfPTable(9);
             table.setWidthPercentage(100);
-            table.setWidths(new float[] {0.65f, 0.95f, 0.85f, 0.95f, 0.95f, 0.75f, 1.15f, 1.75f});
+            table.setWidths(new float[] {0.6f, 0.9f, 0.8f, 0.9f, 0.9f, 0.75f, 1.0f, 1.1f, 1.6f});
             table.setSpacingBefore(4f);
 
             String[] headers = {
@@ -181,6 +191,7 @@ public class EventExportService {
                 "Output slave",
                 "Output channel",
                 "Status",
+                "Mode",
                 "Event date",
                 "Event time"
             };
@@ -200,6 +211,7 @@ public class EventExportService {
                 table.addCell(dataCell(Integer.toString(e.getOutputChannel()), cellFont, bg));
                 table.addCell(
                         dataCell(e.getStatus() == null ? "" : e.getStatus().name(), cellFont, bg));
+                table.addCell(dataCell(e.getMode() == null ? "" : e.getMode().name(), cellFont, bg));
                 table.addCell(dataCell(formatExportEventDate(e.getEventTime(), zone), cellFont, bg));
                 table.addCell(dataCell(formatExportEventTime(e.getEventTime(), zone), cellFont, bg));
                 i++;

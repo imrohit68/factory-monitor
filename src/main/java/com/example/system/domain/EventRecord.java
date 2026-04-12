@@ -1,5 +1,6 @@
 package com.example.system.domain;
 
+import com.example.system.config.OperationMode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -41,6 +42,10 @@ public class EventRecord {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 16)
     private EventStatus status = EventStatus.OPEN;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "mode", length = 16)
+    private OperationMode mode;
 
     @Column(name = "event_time", nullable = false)
     private Instant eventTime;

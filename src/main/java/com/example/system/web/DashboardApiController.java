@@ -1,10 +1,15 @@
 package com.example.system.web;
 
+import com.example.system.config.ApplicationOperationMode;
 import com.example.system.service.OrchestrationService;
+import com.example.system.service.SimulationInputService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.CacheControl;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -16,11 +21,26 @@ import java.util.Map;
 public class DashboardApiController {
 
     private final OrchestrationService orchestration;
+    private final ApplicationOperationMode applicationOperationMode;
+    private final SimulationInputService simulationInputService;
 
     @GetMapping
     public ResponseEntity<Map<String, Object>> dashboard() {
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore().mustRevalidate())
                 .body(orchestration.buildDashboardApiResponse());
+    }
+
+    @PostMapping("/simulation/toggle/{slotId}")
+    public ResponseEntity<Void> toggleSimulation(@PathVariable Long slotId) {
+        if (!applicationOperationMode.isMaintenanceMode()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        try {
+            simulationInputService.toggleBitForSlot(slotId);
+            return ResponseEntity.noContent().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 }
