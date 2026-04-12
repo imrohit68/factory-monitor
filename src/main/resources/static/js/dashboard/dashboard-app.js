@@ -75,10 +75,8 @@
                 _queuedKeys: {},
                 // Snapshot of currently active audios by key (updated on each sync()).
                 _activeAudioByKey: {},
-                // Per-audio replay timers started after playback ends.
-                _replayTimerByKey: {},
-                // Number of repeats already queued/played per active key (resets on OFF->ON).
-                _replayCountByKey: {},
+                // First dashboard poll bootstraps active state without replaying audio.
+                _audioStateBootstrapped: false,
                 _pollInterval: null,
                 _visibilityHandler: null,
                 _beforeUnloadHandler: null,
@@ -440,13 +438,6 @@
                 // Do not clear last-played timestamps; each audio has its own 15-minute timer.
                 this._playQueue = [];
                 this._queuedKeys = {};
-                this._activeAudioByKey = {};
-                // Clear any scheduled per-key replay timers.
-                for (const key of Object.keys(this._replayTimerByKey || {})) {
-                    clearTimeout(this._replayTimerByKey[key]);
-                    delete this._replayTimerByKey[key];
-                }
-                this._replayCountByKey = {};
             },
             playAlertItem(item) {
                 if (!item) return;
@@ -563,48 +554,9 @@
                 return null;
             },
             onAlertAudioEnded() {
-                const endedKey = this.playingKey;
-                console.log('Audio ended, playingKey:', endedKey);
+                console.log('Audio ended, playingKey:', this.playingKey);
                 this.playingKey = null;
                 this.playlistIdx = 0;
-
-                // Start the per-audio 15-minute replay timer AFTER playback ends.
-                const repeatMs = typeof this.repeatEveryMs === 'number' ? this.repeatEveryMs : 15 * 60 * 1000;
-                const maxRepeats = typeof this.maxAlertRepeats === 'number' ? this.maxAlertRepeats : 4;
-                if (endedKey != null) {
-                    if (this._replayTimerByKey[endedKey] != null) {
-                        clearTimeout(this._replayTimerByKey[endedKey]);
-                        delete this._replayTimerByKey[endedKey];
-                    }
-
-                    this._replayTimerByKey[endedKey] = setTimeout(() => {
-                        this._replayTimerByKey[endedKey] = null;
-
-                        // If tab is hidden, don't start new audio.
-                        if (document.hidden) return;
-
-                        // Replay only if the switch is still ON and we have an active audio URL.
-                        const item = this.getActiveAudioItemByKey(endedKey);
-                        if (!item) return;
-
-                        // Stop repeating this key after max repeats.
-                        const replayCount = Number(this._replayCountByKey[endedKey] || 0);
-                        if (replayCount >= maxRepeats) return;
-
-                        // Avoid overlap / duplicates.
-                        if (this.playingKey === item.key) return;
-                        if (this._queuedKeys[item.key]) return;
-
-                        this._playQueue.push(item);
-                        this._queuedKeys[item.key] = true;
-                        this._replayCountByKey[endedKey] = replayCount + 1;
-
-                        // Deterministic order (optional but stable).
-                        this._playQueue.sort((a, b) => a.bit - b.bit || String(a.key).localeCompare(String(b.key)));
-
-                        this.tryPlayNextFromQueue();
-                    }, repeatMs);
-                }
 
                 const gap = typeof this.alertGapMs === 'number' ? this.alertGapMs : 400;
                 this.clearAlertGapTimer();
@@ -616,6 +568,9 @@
             syncAlertAudioPlaylist(workstations) {
                 const pl = this.buildActiveAudioPlaylist(workstations);
                 if (pl.length === 0) {
+                    // With no active alerts, clear the active snapshot so the next ON transition can play once.
+                    this._audioStateBootstrapped = true;
+                    this._activeAudioByKey = {};
                     console.log('No active audio, stopping playback');
                     this.stopAlertAudio();
                     return;
@@ -629,7 +584,15 @@
                     activeByKey[item.key] = item;
                     activeNowSet.add(item.key);
                 }
-                this._activeAudioByKey = activeByKey;
+
+                // First sync after page load: seed active state and do not replay already-active alerts.
+                if (!this._audioStateBootstrapped) {
+                    this._activeAudioByKey = activeByKey;
+                    this._audioStateBootstrapped = true;
+                    this._playQueue = [];
+                    this._queuedKeys = {};
+                    return;
+                }
 
                 // Purge queued items that are no longer active.
                 if (this._playQueue.length) {
@@ -639,14 +602,9 @@
                     if (!activeNowSet.has(key)) delete this._queuedKeys[key];
                 }
 
-                // OFF transitions: cancel any scheduled replay timer for that key.
+                // OFF transitions.
                 for (const key of Object.keys(prevActiveByKey)) {
                     if (activeNowSet.has(key)) continue;
-                    if (this._replayTimerByKey[key] != null) {
-                        clearTimeout(this._replayTimerByKey[key]);
-                        delete this._replayTimerByKey[key];
-                    }
-                    delete this._replayCountByKey[key];
                     delete this._queuedKeys[key];
                 }
 
@@ -655,19 +613,13 @@
                     const wasActive = !!prevActiveByKey[item.key];
                     if (wasActive) continue;
 
-                    // If a timer exists (e.g., due to timing races), clear it; new timer starts after this playback ends.
-                    if (this._replayTimerByKey[item.key] != null) {
-                        clearTimeout(this._replayTimerByKey[item.key]);
-                        delete this._replayTimerByKey[item.key];
-                    }
-                    this._replayCountByKey[item.key] = 0;
-
                     if (item.key === this.playingKey) continue;
                     if (this._queuedKeys[item.key]) continue;
 
                     this._playQueue.push(item);
                     this._queuedKeys[item.key] = true;
                 }
+                this._activeAudioByKey = activeByKey;
 
                 // Deterministic ordering: by bit then key.
                 if (this._playQueue.length) {
