@@ -456,14 +456,23 @@
                 a.loop = false;
                 this.playingKey = item.key;
 
-                const sameSrc = this.audioSrcMatches(a, item.url);
-                if (!sameSrc) {
+                // JavaFX WebView: second play of the same URL often stays silent if we only seek to 0.
+                // Clear and reload the resource so decode/output restarts reliably.
+                try {
                     a.pause();
                     a.currentTime = 0;
+                    if (this.audioSrcMatches(a, item.url)) {
+                        a.removeAttribute('src');
+                        a.load();
+                    }
+                    a.muted = false;
+                    if (typeof a.volume === 'number') {
+                        a.volume = 1;
+                    }
                     a.src = item.url;
                     a.load();
-                } else if (!a.paused && !a.ended) {
-                    return;
+                } catch (e) {
+                    /* ignore */
                 }
 
                 const guard = { cancelled: false };
@@ -563,6 +572,16 @@
                 return null;
             },
             onAlertAudioEnded() {
+                // If we left the element "playing" (e.g. watchdog fired before a real `ended` in WebView),
+                // pause so the next replay does not hit playAlertItem's same-src early-return with playingKey stuck.
+                const a = this._audioEl;
+                if (a) {
+                    try {
+                        a.pause();
+                    } catch (e) {
+                        /* ignore */
+                    }
+                }
                 const endedKey = this.playingKey;
                 console.log('Audio ended, playingKey:', endedKey);
                 this.playingKey = null;
