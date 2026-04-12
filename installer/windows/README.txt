@@ -6,17 +6,21 @@ The build script also copies app-icon.ico and app-logo.png into the jpackage app
 - Start Menu / Desktop shortcuts can use app-icon.ico
 - app-logo.png remains beside the launcher for branding (default run mode opens the system browser, not JavaFX)
 
-Source of truth for the logo asset is the same as the desktop window icon:
+Source of truth for the Windows launcher / .exe icon matches the web UI header:
+  src/main/resources/static/images/app-logo.svg
+(ImageMagick renders it with a transparent background, same as <img src="…app-logo.svg">.)
+
+The desktop JavaFX window icon still loads
   src/main/resources/static/images/app-logo.png
-(has transparency / alpha). Web templates may use app-logo.svg; keep PNG in sync when the brand changes.
+from the classpath or next to the launcher — export an updated PNG from the SVG when the brand changes so both match.
 
-Regenerate installer/windows/app-icon.ico after changing the PNG (from repo root, macOS/Linux with ImageMagick):
+Regenerate installer/windows/app-icon.ico after changing the SVG (from repo root, macOS/Linux with ImageMagick):
 
-  magick src/main/resources/static/images/app-logo.png \
+  magick -background none src/main/resources/static/images/app-logo.svg \
     -define icon:auto-resize=256,128,96,64,48,32,16 \
     installer/windows/app-icon.ico
 
-This embeds multiple sizes with alpha (no white padding). On Windows without magick, use any tool that exports a multi-size .ico (16–256 px) from the PNG.
+On Windows without magick, use any tool that exports a multi-size .ico (16–256 px) from the SVG with transparency preserved.
 
 ffmpeg.exe (Windows installer / OGG alert audio)
 -----------------------------------------------
