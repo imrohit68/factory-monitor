@@ -6,16 +6,17 @@ The build script also copies app-icon.ico and app-logo.png into the jpackage app
 - Start Menu / Desktop shortcuts can use app-icon.ico
 - app-logo.png remains beside the launcher for branding (default run mode opens the system browser, not JavaFX)
 
-It was generated from src/main/resources/static/images/app-logo.png (padded to a square
-with macOS `sips`, then converted with png-to-ico). To regenerate after changing the logo:
+Source of truth for the logo asset is the same as the desktop window icon:
+  src/main/resources/static/images/app-logo.png
+(has transparency / alpha). Web templates may use app-logo.svg; keep PNG in sync when the brand changes.
 
-  sips -p WIDTH HEIGHT --padColor FFFFFF app-logo.png --out square.png
-  (use WIDTH = HEIGHT = max(original width, height))
+Regenerate installer/windows/app-icon.ico after changing the PNG (from repo root, macOS/Linux with ImageMagick):
 
-  npm install png-to-ico
-  npx png-to-ico square.png > installer/windows/app-icon.ico
+  magick src/main/resources/static/images/app-logo.png \
+    -define icon:auto-resize=256,128,96,64,48,32,16 \
+    installer/windows/app-icon.ico
 
-Or use any tool that exports a multi-size .ico (16–256 px).
+This embeds multiple sizes with alpha (no white padding). On Windows without magick, use any tool that exports a multi-size .ico (16–256 px) from the PNG.
 
 ffmpeg.exe (Windows installer / OGG alert audio)
 -----------------------------------------------
