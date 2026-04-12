@@ -64,6 +64,8 @@
                 _currentPlaylist: [],
                 _audioEl: null,
                 _alertGapTimer: null,
+                _playWatchdogTimer: null,
+                _currentPlayGuard: null,
                 // Per-audio scheduling state (per active audio item key).
                 _lastPlayedByKey: {},
                 // Queue of due audios to play (no overlap; only one Audio element).
@@ -370,6 +372,11 @@
                 console.log('Stopping audio playback');
                 this.showAudioGestureHint = false;
                 this.clearAlertGapTimer();
+                if (this._currentPlayGuard) this._currentPlayGuard.cancelled = true;
+                if (this._playWatchdogTimer != null) {
+                    clearTimeout(this._playWatchdogTimer);
+                    this._playWatchdogTimer = null;
+                }
                 if (this._audioEl) {
                     this._audioEl.pause();
                     this._audioEl.currentTime = 0;
@@ -391,61 +398,70 @@
                 }
                 this._replayCountByKey = {};
             },
-            playFromPlaylistIndex(i) {
-                const pl = this._currentPlaylist;
-                if (!pl || !pl[i]) {
-                    console.warn('playFromPlaylistIndex: invalid index or empty playlist', i, pl);
-                    return;
-                }
-                this.clearAlertGapTimer();
-                const a = this.ensureAudioElement();
-                const item = pl[i];
-                console.log('playFromPlaylistIndex:', i, 'of', pl.length, 'url:', item.url, 'key:', item.key);
-                // We do "play once", so never loop tracks.
-                a.loop = false;
-                this.playlistIdx = i;
-                this.playingKey = item.key;
-                const sameSrc = this.audioSrcMatches(a, item.url);
-                
-                if (!sameSrc) {
-                    console.log('Loading new audio source:', item.url);
-                    a.pause();
-                    a.currentTime = 0;
-                    a.src = item.url;
-                    a.load();
-                    this.notifyPlayAttempt(a.play());
-                } else if (a.paused || a.ended) {
-                    console.log('Resuming audio playback');
-                    this.notifyPlayAttempt(a.play());
-                }
-            },
             playAlertItem(item) {
                 if (!item) return;
-                if (this.playingKey != null) return; // safety: no overlap
+                if (this.playingKey != null) return;
 
                 const a = this.ensureAudioElement();
-                // Always play once; no looping.
                 a.loop = false;
                 this.playingKey = item.key;
 
                 const sameSrc = this.audioSrcMatches(a, item.url);
                 if (!sameSrc) {
-                    console.log('Loading audio source:', item.url, 'key:', item.key);
                     a.pause();
                     a.currentTime = 0;
                     a.src = item.url;
                     a.load();
                 } else if (!a.paused && !a.ended) {
-                    // Already playing this src; avoid restarting.
                     return;
                 }
 
+                const guard = { cancelled: false };
+                this._currentPlayGuard = guard;
+
+                const armWatchdog = (durationSeconds) => {
+                    if (guard.cancelled) return;
+                    const safeMs = Number.isFinite(durationSeconds) && durationSeconds > 0
+                        ? (durationSeconds * 1000) + 500
+                        : 8000;
+                    this._playWatchdogTimer = setTimeout(() => {
+                        if (guard.cancelled) return;
+                        console.warn('JavaFX watchdog fired — ended event was not received');
+                        this.onAlertAudioEnded();
+                    }, safeMs);
+                };
+
+                const clearWatchdog = () => {
+                    if (this._playWatchdogTimer != null) {
+                        clearTimeout(this._playWatchdogTimer);
+                        this._playWatchdogTimer = null;
+                    }
+                };
+
+                if (a.duration && Number.isFinite(a.duration)) {
+                    armWatchdog(a.duration);
+                } else {
+                    const onMeta = () => {
+                        a.removeEventListener('loadedmetadata', onMeta);
+                        armWatchdog(a.duration);
+                    };
+                    a.addEventListener('loadedmetadata', onMeta);
+                }
+
+                const onEndedOnce = () => {
+                    a.removeEventListener('ended', onEndedOnce);
+                    if (guard.cancelled) return;
+                    guard.cancelled = true;
+                    clearWatchdog();
+                };
+                a.addEventListener('ended', onEndedOnce);
+
                 this.notifyPlayAttemptWithHandlers(
                     a.play(),
-                    () => {
-                        this._lastPlayedByKey[item.key] = Date.now();
-                    },
-                    () => {
+                    () => { this._lastPlayedByKey[item.key] = Date.now(); },
+                    (err) => {
+                        guard.cancelled = true;
+                        clearWatchdog();
                         if (this.playingKey === item.key) this.playingKey = null;
                     }
                 );
