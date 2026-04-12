@@ -439,6 +439,25 @@
                 this._playQueue = [];
                 this._queuedKeys = {};
             },
+            /**
+             * Stop the clip currently playing when its slot is no longer active, without clearing
+             * the queue (other alerts may still be due). Used after each dashboard sync.
+             */
+            interruptCurrentAlertPlayback() {
+                this.clearAlertGapTimer();
+                if (this._currentPlayGuard) this._currentPlayGuard.cancelled = true;
+                if (this._playWatchdogTimer != null) {
+                    clearTimeout(this._playWatchdogTimer);
+                    this._playWatchdogTimer = null;
+                }
+                if (this._audioEl) {
+                    this._audioEl.pause();
+                    this._audioEl.currentTime = 0;
+                }
+                this.playingKey = null;
+                this.playlistIdx = 0;
+                this._currentPlaylist = [];
+            },
             playAlertItem(item) {
                 if (!item) return;
                 if (this.playingKey != null) return;
@@ -624,6 +643,12 @@
                 // Deterministic ordering: by bit then key.
                 if (this._playQueue.length) {
                     this._playQueue.sort((a, b) => a.bit - b.bit || String(a.key).localeCompare(String(b.key)));
+                }
+
+                // If the input that was driving the current clip went inactive, stop immediately
+                // (otherwise playback continues until "ended" even when other alerts remain).
+                if (this.playingKey != null && !activeNowSet.has(this.playingKey)) {
+                    this.interruptCurrentAlertPlayback();
                 }
 
                 // Start next item if nothing is playing.
