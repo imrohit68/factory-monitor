@@ -27,7 +27,10 @@
     };
     const SPEAKER_FRAME_COUNT = 26;
     const SPEAKER_FRAME_MS = 70;
-    /** Survives refresh and new tabs so a continuous ON is not treated as a new alert after navigation. */
+    /**
+     * Per-tab session snapshot (not shared across tabs) so each dashboard plays alerts independently.
+     * Still survives refresh and in-app navigation return within the same tab.
+     */
     const DASHBOARD_ALERT_ACTIVATION_KEY = 'dashboard-alert-activation-v1';
 
     const { createApp } = Vue;
@@ -81,7 +84,7 @@
                 _replayTimerByKey: {},
                 // Number of repeats already queued/played per active key (resets on OFF->ON).
                 _replayCountByKey: {},
-                /** Mirrors activation snapshot when localStorage is unavailable (e.g. JavaFX WebView). */
+                /** Mirrors activation snapshot when sessionStorage is unavailable (e.g. JavaFX WebView). */
                 _activationSnapshotMemory: {},
                 _pollInterval: null,
                 _visibilityHandler: null,
@@ -424,9 +427,9 @@
                     ? this._activationSnapshotMemory
                     : {};
                 let fromDisk = {};
-                if (typeof window !== 'undefined' && window.localStorage) {
+                if (typeof window !== 'undefined' && window.sessionStorage) {
                     try {
-                        const raw = window.localStorage.getItem(DASHBOARD_ALERT_ACTIVATION_KEY);
+                        const raw = window.sessionStorage.getItem(DASHBOARD_ALERT_ACTIVATION_KEY);
                         if (raw) {
                             const parsed = JSON.parse(raw);
                             const byKey = parsed && typeof parsed === 'object' ? parsed.byKey : null;
@@ -462,11 +465,11 @@
                     };
                 }
                 this._activationSnapshotMemory = normalized;
-                if (typeof window === 'undefined' || !window.localStorage) {
+                if (typeof window === 'undefined' || !window.sessionStorage) {
                     return;
                 }
                 try {
-                    window.localStorage.setItem(
+                    window.sessionStorage.setItem(
                         DASHBOARD_ALERT_ACTIVATION_KEY,
                         JSON.stringify({ byKey: normalized })
                     );
@@ -725,7 +728,7 @@
                     return;
                 }
 
-                // Use a persisted snapshot so refresh / new tab / route return does not look like OFF->ON again.
+                // Per-tab snapshot so refresh / route return in this tab does not look like OFF->ON again.
                 const prevPersisted = this.readPersistedActivationSnapshot();
                 const activeByKey = {};
                 const activeNowSet = new Set();
