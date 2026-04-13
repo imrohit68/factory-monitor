@@ -29,12 +29,8 @@
     const SPEAKER_FRAME_MS = 70;
     /** Shared activation snapshot so refresh, route return, and new tabs preserve the same ON episode. */
     const DASHBOARD_ALERT_ACTIVATION_KEY = 'dashboard-alert-activation-v1';
-    const DASHBOARD_ALERT_PLAYBACK_KEY = 'dashboard-alert-playback-v1';
-    const DASHBOARD_ALERT_PLAYBACK_CHANNEL = 'dashboard-alert-playback-v1';
-    const DASHBOARD_ALERT_PLAYBACK_PUBLISH_MS = 400;
-    const DASHBOARD_ALERT_PLAYBACK_SERVER_PUBLISH_MS = 800;
-    /** Must exceed dashboard poll interval (2s) and network slack; keep in line with server-side playback TTL. */
-    const DASHBOARD_ALERT_PLAYBACK_STALE_MS = 15000;
+    /** Per-tab: which slot keys this tab has already started audio for (avoids cross-tab localStorage suppressing play). */
+    const DASHBOARD_LOCAL_PLAYED_ACTIVATION_KEY = 'dashboard-local-played-activation-v1';
 
     const { createApp } = Vue;
 
@@ -83,24 +79,19 @@
                 _queuedKeys: {},
                 // Snapshot of currently active audios by key (updated on each sync()).
                 _activeAudioByKey: {},
-                // Per-audio replay timers started after playback ends.
-                _replayTimerByKey: {},
-                // Number of repeats already queued/played per active key (resets on OFF->ON).
+                // Number of server-driven replay epochs consumed per active key (resets on OFF->ON).
                 _replayCountByKey: {},
                 /** Mirrors activation snapshot when localStorage is unavailable (e.g. JavaFX WebView). */
                 _activationSnapshotMemory: {},
-                _playbackSyncChannel: null,
-                _playbackSyncSenderId:
-                    'dashboard-tab-' + Date.now() + '-' + Math.random().toString(36).slice(2),
-                _playbackSyncPublishTimer: null,
-                _lastServerPlaybackPublishAt: 0,
-                _serverPlaybackState: null,
                 /** Per slot key: { activationId, endedAtMs } from server so new tabs skip replay until repeat interval. */
                 _serverPlaybackLastEnded: {},
-                /** serverTimeMs from last /api/dashboard minus local Date.now() — aligns playback sync across hosts/clocks. */
+                /** Per slot key: server replay generation from GET /api/dashboard (repeat alignment). */
+                _serverReplayEpoch: {},
+                _consumedServerReplayEpochByKey: {},
+                /** This tab only: slot key -> openEventId after successful play(). */
+                _localPlayedActivationByKey: {},
+                /** serverTimeMs from last /api/dashboard minus local Date.now() — aligns server cooldown checks. */
                 _serverTimeSkewMs: 0,
-                _storagePlaybackHandler: null,
-                _broadcastPlaybackHandler: null,
                 _pollInterval: null,
                 _visibilityHandler: null,
                 _beforeUnloadHandler: null,
@@ -129,10 +120,10 @@
             }
         },
         mounted() {
+            this._loadLocalPlayedActivationFromSessionStorage();
             this.refresh();
             this._pollInterval = setInterval(() => this.refresh(), 2000);
-            this.setupPlaybackSync();
-            
+
             this._visibilityHandler = () => {
                 if (document.hidden) {
                     console.log('Page hidden event (alert audio continues in background)');
@@ -168,7 +159,6 @@
             console.log('Component unmounting');
             this.stopSpeakerAnimation();
             this.stopAlertAudio();
-            this.teardownPlaybackSync();
             if (this._pollInterval) {
                 clearInterval(this._pollInterval);
                 this._pollInterval = null;
@@ -241,7 +231,8 @@
              * so tooltips are not clipped horizontally at the scroll edges.
              */
             cellTooltipRootClass(rowIdx, colIdx) {
-                const n = this.workstations.length;
+                const wsArr = Array.isArray(this.workstations) ? this.workstations : [];
+                const n = wsArr.length;
                 const lastCol = colIdx === n - 1;
                 const firstCol = n > 1 && colIdx === 0;
 
@@ -313,8 +304,15 @@
             },
             buildActiveAudioPlaylist(workstations) {
                 const out = [];
-                for (const ws of workstations) {
+                const list = Array.isArray(workstations) ? workstations : [];
+                for (const ws of list) {
+                    if (!ws || typeof ws !== 'object') {
+                        continue;
+                    }
                     for (const slot of ws.slots || []) {
+                        if (!slot || typeof slot !== 'object') {
+                            continue;
+                        }
                         if (slot.active && slot.audioUrl) {
                             console.log('Active slot with audio:', slot.slotId, 'url:', slot.audioUrl, 'bit:', slot.inputBitIndex);
                             out.push({
@@ -458,173 +456,12 @@
                     this._repeatTimer = null;
                 }
             },
-            setupPlaybackSync() {
-                if (typeof window !== 'undefined') {
-                    this._storagePlaybackHandler = (e) => {
-                        if (e.key !== DASHBOARD_ALERT_PLAYBACK_KEY || !e.newValue) return;
-                        this.onSharedPlaybackSignal(e.newValue);
-                    };
-                    window.addEventListener('storage', this._storagePlaybackHandler);
-                }
-                if (typeof BroadcastChannel !== 'undefined') {
-                    try {
-                        this._playbackSyncChannel = new BroadcastChannel(DASHBOARD_ALERT_PLAYBACK_CHANNEL);
-                        this._broadcastPlaybackHandler = (e) => this.onSharedPlaybackSignal(e && e.data);
-                        this._playbackSyncChannel.addEventListener('message', this._broadcastPlaybackHandler);
-                    } catch (e) {
-                        console.warn('Failed to open dashboard playback sync channel:', e);
-                        this._playbackSyncChannel = null;
-                        this._broadcastPlaybackHandler = null;
-                    }
-                }
-            },
-            teardownPlaybackSync() {
-                this.clearPlaybackSyncPublisher();
-                if (this._playbackSyncChannel && this._broadcastPlaybackHandler) {
-                    this._playbackSyncChannel.removeEventListener('message', this._broadcastPlaybackHandler);
-                }
-                if (this._playbackSyncChannel) {
-                    try {
-                        this._playbackSyncChannel.close();
-                    } catch (e) {
-                        /* ignore */
-                    }
-                    this._playbackSyncChannel = null;
-                }
-                this._broadcastPlaybackHandler = null;
-                if (typeof window !== 'undefined' && this._storagePlaybackHandler) {
-                    window.removeEventListener('storage', this._storagePlaybackHandler);
-                }
-                this._storagePlaybackHandler = null;
-            },
-            normalizePlaybackState(raw) {
-                if (!raw) return null;
-                let parsed = raw;
-                if (typeof raw === 'string') {
-                    try {
-                        parsed = JSON.parse(raw);
-                    } catch (e) {
-                        return null;
-                    }
-                }
-                if (!parsed || typeof parsed !== 'object') return null;
-                const key = parsed.key == null || parsed.key === '' ? null : String(parsed.key);
-                const url = this.normalizeAudioUrl(parsed.url);
-                const activationId =
-                    parsed.activationId == null || parsed.activationId === ''
-                        ? null
-                        : String(parsed.activationId);
-                const wallClockStartMs = Number(parsed.wallClockStartMs);
-                const updatedAtMs = Number(parsed.updatedAtMs);
-                const senderId =
-                    parsed.senderId == null || parsed.senderId === ''
-                        ? null
-                        : String(parsed.senderId);
-                if (!key || !url) return null;
-                if (!Number.isFinite(wallClockStartMs) || !Number.isFinite(updatedAtMs)) return null;
-                return {
-                    key,
-                    url,
-                    activationId,
-                    wallClockStartMs,
-                    updatedAtMs,
-                    senderId
-                };
-            },
-            readSharedPlaybackState() {
-                if (typeof window === 'undefined' || !window.localStorage) {
-                    return null;
-                }
-                try {
-                    return this.normalizePlaybackState(window.localStorage.getItem(DASHBOARD_ALERT_PLAYBACK_KEY));
-                } catch (e) {
-                    console.warn('Failed to read shared dashboard playback state:', e);
-                    return null;
-                }
-            },
-            bestSharedPlaybackState() {
-                let best = null;
-                for (const candidate of arguments) {
-                    const normalized = this.normalizePlaybackState(candidate);
-                    if (!normalized || !this.isPlaybackStateFresh(normalized)) {
-                        continue;
-                    }
-                    if (!best || normalized.updatedAtMs > best.updatedAtMs) {
-                        best = normalized;
-                    }
-                }
-                return best;
-            },
-            writeSharedPlaybackState(state) {
-                if (!state) {
-                    return;
-                }
-                if (typeof window !== 'undefined' && window.localStorage) {
-                    const payload = JSON.stringify(state);
-                    try {
-                        window.localStorage.setItem(DASHBOARD_ALERT_PLAYBACK_KEY, payload);
-                    } catch (e) {
-                        console.warn('Failed to write shared dashboard playback state:', e);
-                    }
-                }
-                if (this._playbackSyncChannel) {
-                    try {
-                        this._playbackSyncChannel.postMessage(state);
-                    } catch (e) {
-                        console.warn('Failed to broadcast dashboard playback state:', e);
-                    }
-                }
-            },
-            async publishPlaybackStateToServer(state) {
-                if (!state) {
-                    return;
-                }
-                try {
-                    await fetch('/api/dashboard/playback-sync', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(state)
-                    });
-                } catch (e) {
-                    console.warn('Failed to publish dashboard playback state to server:', e);
-                }
-            },
-            async clearPlaybackStateOnServer() {
-                if (!this._playbackSyncSenderId) {
-                    return;
-                }
-                try {
-                    await fetch('/api/dashboard/playback-sync/clear', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ senderId: this._playbackSyncSenderId })
-                    });
-                } catch (e) {
-                    console.warn('Failed to clear dashboard playback state on server:', e);
-                }
-            },
-            isPlaybackStateFresh(state) {
-                if (!state) return false;
-                const ageMs = this.alignedNowMs() - state.updatedAtMs;
-                return ageMs >= -1000 && ageMs <= DASHBOARD_ALERT_PLAYBACK_STALE_MS;
-            },
-            samePlaybackActivation(state, item) {
-                if (!state || !item) return false;
-                if (String(state.key) !== String(item.key)) return false;
-                if (this.normalizeAudioUrlPathKey(state.url) !== this.normalizeAudioUrlPathKey(item.url)) {
-                    return false;
-                }
-                const stateActivation = state.activationId == null ? null : String(state.activationId);
-                const itemActivation = item.activationId == null ? null : String(item.activationId);
-                return stateActivation === itemActivation;
-            },
             /**
-             * Another client (e.g. desktop app) already finished this clip for the same openEventId; do not start
-             * from 0 on this tab until the repeat window passes or a new publish clears the marker.
+             * Another client already finished this clip for the same openEventId; do not start from 0 on this tab
+             * until the repeat window passes (server clock via alignedNowMs).
              */
-            shouldSkipInitialPlayDueToServerEndedCooldown(item, sharedPlayback) {
+            shouldSkipInitialPlayDueToServerEndedCooldown(item) {
                 if (!item) return false;
-                if (sharedPlayback && this.samePlaybackActivation(sharedPlayback, item)) return false;
                 const row = this._serverPlaybackLastEnded && this._serverPlaybackLastEnded[item.key];
                 if (!row || item.activationId == null || row.activationId == null) return false;
                 if (String(row.activationId) !== String(item.activationId)) return false;
@@ -649,83 +486,43 @@
                     console.warn('Failed to record alert clip end on server:', e);
                 }
             },
-            publishPlaybackState(item, currentTimeSeconds) {
-                if (!item) return;
-                const now = Date.now();
-                const currentSec =
-                    Number.isFinite(currentTimeSeconds) && currentTimeSeconds >= 0
-                        ? currentTimeSeconds
-                        : 0;
-                const pathKey = this.normalizeAudioUrlPathKey(item.url);
-                const state = {
-                    key: String(item.key),
-                    url: pathKey || this.normalizeAudioUrl(item.url),
-                    activationId: item.activationId == null ? null : String(item.activationId),
-                    wallClockStartMs: now - Math.round(currentSec * 1000),
-                    updatedAtMs: now,
-                    senderId: this._playbackSyncSenderId
-                };
-                this.writeSharedPlaybackState(state);
-                this._serverPlaybackState = state;
-                if (
-                    this._lastServerPlaybackPublishAt === 0 ||
-                    (now - this._lastServerPlaybackPublishAt) >= DASHBOARD_ALERT_PLAYBACK_SERVER_PUBLISH_MS
-                ) {
-                    this._lastServerPlaybackPublishAt = now;
-                    void this.publishPlaybackStateToServer(state);
+            _loadLocalPlayedActivationFromSessionStorage() {
+                if (typeof sessionStorage === 'undefined') {
+                    return;
                 }
-            },
-            clearPlaybackSyncPublisher() {
-                if (this._playbackSyncPublishTimer != null) {
-                    clearInterval(this._playbackSyncPublishTimer);
-                    this._playbackSyncPublishTimer = null;
-                }
-            },
-            startPlaybackSyncPublisher(item, initialCurrentTimeSeconds) {
-                this.clearPlaybackSyncPublisher();
-                let firstTick = true;
-                const publish = () => {
-                    if (this.playingKey !== item.key) return;
-                    const a = this._audioEl;
-                    if (!a) return;
-                    let currentTimeSeconds =
-                        Number.isFinite(a.currentTime) && a.currentTime >= 0 ? a.currentTime : 0;
-                    if (
-                        firstTick &&
-                        Number.isFinite(initialCurrentTimeSeconds) &&
-                        initialCurrentTimeSeconds > currentTimeSeconds
-                    ) {
-                        currentTimeSeconds = initialCurrentTimeSeconds;
+                try {
+                    const raw = sessionStorage.getItem(DASHBOARD_LOCAL_PLAYED_ACTIVATION_KEY);
+                    if (!raw) {
+                        return;
                     }
-                    this.publishPlaybackState(item, currentTimeSeconds);
-                    firstTick = false;
-                };
-                publish();
-                this._playbackSyncPublishTimer = setInterval(
-                    publish,
-                    DASHBOARD_ALERT_PLAYBACK_PUBLISH_MS
-                );
-            },
-            /** When another client is already playing this clip, start it here from the beginning (no seek into the file). */
-            maybeJoinFromPlaybackState(state) {
-                const normalized = this.normalizePlaybackState(state);
-                if (!normalized || !this.isPlaybackStateFresh(normalized)) {
-                    return false;
+                    const parsed = JSON.parse(raw);
+                    if (!parsed || typeof parsed !== 'object') {
+                        return;
+                    }
+                    const next = {};
+                    for (const [k, v] of Object.entries(parsed)) {
+                        if (v == null || v === '') {
+                            continue;
+                        }
+                        next[String(k)] = String(v);
+                    }
+                    this._localPlayedActivationByKey = next;
+                } catch (e) {
+                    console.warn('Failed to read per-tab played activation snapshot:', e);
                 }
-                if (normalized.senderId === this._playbackSyncSenderId) {
-                    return false;
-                }
-                const item = this.getActiveAudioItemByKey(normalized.key);
-                if (!item) return false;
-                if (!this.samePlaybackActivation(normalized, item)) return false;
-                if (this.playingKey != null) return false;
-                if (this._queuedKeys[item.key]) return false;
-                // Playlist-level only: start this clip from the beginning (no mid-file seek).
-                this.playAlertItem(item);
-                return true;
             },
-            onSharedPlaybackSignal(rawState) {
-                this.maybeJoinFromPlaybackState(rawState);
+            _saveLocalPlayedActivationToSessionStorage() {
+                if (typeof sessionStorage === 'undefined') {
+                    return;
+                }
+                try {
+                    sessionStorage.setItem(
+                        DASHBOARD_LOCAL_PLAYED_ACTIVATION_KEY,
+                        JSON.stringify(this._localPlayedActivationByKey || {})
+                    );
+                } catch (e) {
+                    console.warn('Failed to write per-tab played activation snapshot:', e);
+                }
             },
             readPersistedActivationSnapshot() {
                 const mem = this._activationSnapshotMemory && typeof this._activationSnapshotMemory === 'object'
@@ -810,10 +607,6 @@
                 console.log('Stopping audio playback');
                 this.showAudioGestureHint = false;
                 this.clearAlertGapTimer();
-                this.clearPlaybackSyncPublisher();
-                this._lastServerPlaybackPublishAt = 0;
-                this._serverPlaybackState = null;
-                void this.clearPlaybackStateOnServer();
                 if (this._currentPlayGuard) this._currentPlayGuard.cancelled = true;
                 if (this._playWatchdogTimer != null) {
                     clearTimeout(this._playWatchdogTimer);
@@ -833,12 +626,10 @@
                 this._playQueue = [];
                 this._queuedKeys = {};
                 this._activeAudioByKey = {};
-                // Clear any scheduled per-key replay timers.
-                for (const key of Object.keys(this._replayTimerByKey || {})) {
-                    clearTimeout(this._replayTimerByKey[key]);
-                    delete this._replayTimerByKey[key];
-                }
                 this._replayCountByKey = {};
+                this._consumedServerReplayEpochByKey = {};
+                this._localPlayedActivationByKey = {};
+                this._saveLocalPlayedActivationToSessionStorage();
             },
             playAlertItem(item) {
                 if (!item) return;
@@ -913,12 +704,14 @@
                         a.play(),
                         () => {
                             this._lastPlayedByKey[item.key] = Date.now();
-                            this.startPlaybackSyncPublisher(item, initialCurrentTimeSeconds);
+                            if (item.activationId != null && item.activationId !== '') {
+                                this._localPlayedActivationByKey[item.key] = String(item.activationId);
+                                this._saveLocalPlayedActivationToSessionStorage();
+                            }
                         },
                         () => {
                             guard.cancelled = true;
                             clearWatchdog();
-                            this.clearPlaybackSyncPublisher();
                             if (this.playingKey === item.key) this.playingKey = null;
                         }
                     );
@@ -990,48 +783,9 @@
                         /* ignore */
                     }
                 }
-                this.clearPlaybackSyncPublisher();
-                this._lastServerPlaybackPublishAt = 0;
-                this._serverPlaybackState = null;
-                void this.clearPlaybackStateOnServer();
                 console.log('Audio ended, playingKey:', endedKey);
                 this.playingKey = null;
                 this.playlistIdx = 0;
-
-                // Start the per-audio 15-minute replay timer AFTER playback ends.
-                const repeatMs = typeof this.repeatEveryMs === 'number' ? this.repeatEveryMs : 15 * 60 * 1000;
-                const maxRepeats = typeof this.maxAlertRepeats === 'number' ? this.maxAlertRepeats : 4;
-                if (endedKey != null) {
-                    if (this._replayTimerByKey[endedKey] != null) {
-                        clearTimeout(this._replayTimerByKey[endedKey]);
-                        delete this._replayTimerByKey[endedKey];
-                    }
-
-                    this._replayTimerByKey[endedKey] = setTimeout(() => {
-                        this._replayTimerByKey[endedKey] = null;
-
-                        // Replay only if the switch is still ON and we have an active audio URL.
-                        const item = this.getActiveAudioItemByKey(endedKey);
-                        if (!item) return;
-
-                        // Stop repeating this key after max repeats.
-                        const replayCount = Number(this._replayCountByKey[endedKey] || 0);
-                        if (replayCount >= maxRepeats) return;
-
-                        // Avoid overlap / duplicates.
-                        if (this.playingKey === item.key) return;
-                        if (this._queuedKeys[item.key]) return;
-
-                        this._playQueue.push(item);
-                        this._queuedKeys[item.key] = true;
-                        this._replayCountByKey[endedKey] = replayCount + 1;
-
-                        // Deterministic order (optional but stable).
-                        this._playQueue.sort((a, b) => a.bit - b.bit || String(a.key).localeCompare(String(b.key)));
-
-                        this.tryPlayNextFromQueue();
-                    }, repeatMs);
-                }
 
                 const gap = typeof this.alertGapMs === 'number' ? this.alertGapMs : 400;
                 this.clearAlertGapTimer();
@@ -1041,7 +795,9 @@
                 }, gap);
             },
             syncAlertAudioPlaylist(workstations) {
-                const pl = this.buildActiveAudioPlaylist(workstations);
+                try {
+                    const wsList = Array.isArray(workstations) ? workstations : [];
+                    const pl = this.buildActiveAudioPlaylist(wsList);
                 if (pl.length === 0) {
                     console.log('No active audio, stopping playback');
                     this.writePersistedActivationSnapshot({});
@@ -1067,39 +823,33 @@
                     if (!activeNowSet.has(key)) delete this._queuedKeys[key];
                 }
 
-                // OFF transitions: cancel any scheduled replay timer for that key.
+                // OFF transitions: drop per-key repeat state for inactive keys.
                 for (const key of Object.keys(prevPersisted)) {
                     if (activeNowSet.has(key)) continue;
-                    if (this._replayTimerByKey[key] != null) {
-                        clearTimeout(this._replayTimerByKey[key]);
-                        delete this._replayTimerByKey[key];
-                    }
                     delete this._replayCountByKey[key];
                     delete this._queuedKeys[key];
+                    delete this._consumedServerReplayEpochByKey[key];
+                    delete this._localPlayedActivationByKey[key];
                 }
-
-                const sharedPlayback = this.bestSharedPlaybackState(
-                    this.readSharedPlaybackState(),
-                    this._serverPlaybackState
-                );
+                this._saveLocalPlayedActivationToSessionStorage();
 
                 // ON transitions: enqueue immediate playback for newly active keys (new activation or new URL).
                 for (const item of pl) {
-                    const wasActive = this.sameActivationPersisted(prevPersisted[item.key], item);
-                    if (wasActive) continue;
-                    if (sharedPlayback && this.samePlaybackActivation(sharedPlayback, item)) continue;
-                    if (this.shouldSkipInitialPlayDueToServerEndedCooldown(item, sharedPlayback)) continue;
-
-                    // If a timer exists (e.g., due to timing races), clear it; new timer starts after this playback ends.
-                    if (this._replayTimerByKey[item.key] != null) {
-                        clearTimeout(this._replayTimerByKey[item.key]);
-                        delete this._replayTimerByKey[item.key];
-                    }
-                    this._replayCountByKey[item.key] = 0;
+                    const persistedMatches = this.sameActivationPersisted(prevPersisted[item.key], item);
+                    const aid =
+                        item.activationId == null || item.activationId === undefined
+                            ? null
+                            : String(item.activationId);
+                    const localAid = this._localPlayedActivationByKey[item.key];
+                    const alreadyStartedThisActivationOnThisTab =
+                        persistedMatches && aid != null && localAid != null && String(localAid) === aid;
+                    if (alreadyStartedThisActivationOnThisTab) continue;
+                    if (this.shouldSkipInitialPlayDueToServerEndedCooldown(item)) continue;
 
                     if (item.key === this.playingKey) continue;
                     if (this._queuedKeys[item.key]) continue;
 
+                    this._replayCountByKey[item.key] = 0;
                     this._playQueue.push(item);
                     this._queuedKeys[item.key] = true;
                 }
@@ -1117,21 +867,36 @@
                 if (this._playQueue.length) {
                     this._playQueue.sort((a, b) => a.bit - b.bit || String(a.key).localeCompare(String(b.key)));
                 }
-                if (sharedPlayback) {
-                    const sharedItem = activeByKey[sharedPlayback.key];
-                    if (
-                        sharedItem &&
-                        (
-                            this.sameActivationPersisted(prevPersisted[sharedItem.key], sharedItem) ||
-                            this.samePlaybackActivation(sharedPlayback, sharedItem)
-                        )
-                    ) {
-                        this.maybeJoinFromPlaybackState(sharedPlayback);
+
+                // Server-driven repeat: consume replay epochs advanced after clip end + repeat interval.
+                const maxRepeats = typeof this.maxAlertRepeats === 'number' ? this.maxAlertRepeats : 4;
+                for (const item of pl) {
+                    const serverEpoch = Number(this._serverReplayEpoch && this._serverReplayEpoch[item.key]);
+                    if (!Number.isFinite(serverEpoch) || serverEpoch <= 0) continue;
+                    const consumed = Number(this._consumedServerReplayEpochByKey[item.key] || 0);
+                    if (serverEpoch <= consumed) continue;
+                    const replayCount = Number(this._replayCountByKey[item.key] || 0);
+                    if (replayCount >= maxRepeats) {
+                        this._consumedServerReplayEpochByKey[item.key] = serverEpoch;
+                        continue;
                     }
+                    if (item.key === this.playingKey) continue;
+                    if (this._queuedKeys[item.key]) continue;
+
+                    this._playQueue.push(item);
+                    this._queuedKeys[item.key] = true;
+                    this._replayCountByKey[item.key] = replayCount + 1;
+                    this._consumedServerReplayEpochByKey[item.key] = serverEpoch;
+                }
+                if (this._playQueue.length) {
+                    this._playQueue.sort((a, b) => a.bit - b.bit || String(a.key).localeCompare(String(b.key)));
                 }
 
                 // Start next item if nothing is playing.
                 this.tryPlayNextFromQueue();
+                } catch (e) {
+                    console.error('syncAlertAudioPlaylist failed:', e);
+                }
             },
             async refresh() {
                 if (this._refreshInFlight) {
@@ -1145,7 +910,7 @@
                         return;
                     }
                     const j = await res.json();
-                    const next = j.workstations || [];
+                    const next = Array.isArray(j.workstations) ? j.workstations : [];
                     console.log('Dashboard refresh:', next.length, 'workstations');
                     this.workstations = next;
                     if (j.mode) {
@@ -1161,7 +926,8 @@
                     if (typeof j.serverTimeMs === 'number' && Number.isFinite(j.serverTimeMs)) {
                         this._serverTimeSkewMs = j.serverTimeMs - Date.now();
                     }
-                    this._serverPlaybackState = this.normalizePlaybackState(j.playbackSync);
+                    this._serverReplayEpoch =
+                        j.alertReplayEpoch && typeof j.alertReplayEpoch === 'object' ? j.alertReplayEpoch : {};
                     this._serverPlaybackLastEnded =
                         j.alertPlaybackLastEnded && typeof j.alertPlaybackLastEnded === 'object'
                             ? j.alertPlaybackLastEnded

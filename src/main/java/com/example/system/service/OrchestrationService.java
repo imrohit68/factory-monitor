@@ -4,7 +4,7 @@ import com.example.system.config.ApplicationOperationMode;
 import com.example.system.config.AppProperties;
 import com.example.system.config.ModbusProperties;
 import com.example.system.domain.WorkstationSlot;
-import com.example.system.dto.DashboardPlaybackSyncDto;
+import com.example.system.dto.DashboardActiveAlertSlot;
 import com.example.system.dto.DashboardSlotDto;
 import com.example.system.dto.DashboardWorkstationDto;
 import com.example.system.modbus.ModbusMasterService;
@@ -35,6 +35,7 @@ public class OrchestrationService {
     private final WorkstationService workstationService;
     private final AppProperties appProperties;
     private final DashboardPlaybackSyncService dashboardPlaybackSyncService;
+    private final DashboardAlertAudioDirectorService dashboardAlertAudioDirectorService;
 
     private final ConcurrentMap<Long, ChannelFsm> channelBySlotId = new ConcurrentHashMap<>();
     private final ConcurrentMap<Long, Long> openEventIdsBySlotId = new ConcurrentHashMap<>();
@@ -47,7 +48,8 @@ public class OrchestrationService {
             SimulationInputService simulationInputService,
             WorkstationService workstationService,
             AppProperties appProperties,
-            DashboardPlaybackSyncService dashboardPlaybackSyncService) {
+            DashboardPlaybackSyncService dashboardPlaybackSyncService,
+            DashboardAlertAudioDirectorService dashboardAlertAudioDirectorService) {
         this.modbus = modbus;
         this.modbusMaster = modbusMaster;
         this.applicationOperationMode = applicationOperationMode;
@@ -56,6 +58,7 @@ public class OrchestrationService {
         this.workstationService = workstationService;
         this.appProperties = appProperties;
         this.dashboardPlaybackSyncService = dashboardPlaybackSyncService;
+        this.dashboardAlertAudioDirectorService = dashboardAlertAudioDirectorService;
     }
 
     @Scheduled(fixedDelayString = "${system.modbus.poll-interval-ms:5000}")
@@ -177,17 +180,33 @@ public class OrchestrationService {
     @Transactional(readOnly = true)
     public Map<String, Object> buildDashboardApiResponse() {
         Map<String, Object> body = new HashMap<>();
-        body.put("workstations", buildDashboardWorkstations());
+        List<DashboardWorkstationDto> workstations = buildDashboardWorkstations();
+        body.put("workstations", workstations);
         body.put("modbusConnected", isModbusConnected());
         body.put("modbusError", getModbusLastError());
         body.put("mode", applicationOperationMode.getCurrentMode().name());
         body.put("alertRepeatIntervalMinutes", appProperties.getDashboardAlertRepeatIntervalMinutes());
         body.put("alertMaxRepeats", appProperties.getDashboardAlertMaxRepeats());
+        body.put("alertGapMs", appProperties.getDashboardAlertGapMs());
         body.put("serverTimeMs", System.currentTimeMillis());
-        DashboardPlaybackSyncDto playbackSync = dashboardPlaybackSyncService.snapshot();
-        if (playbackSync != null) {
-            body.put("playbackSync", playbackSync);
+
+        List<DashboardActiveAlertSlot> alertSlots = new ArrayList<>();
+        for (DashboardWorkstationDto w : workstations) {
+            for (DashboardSlotDto s : w.slots()) {
+                if (s.active() && s.audioUrl() != null && !s.audioUrl().isBlank() && s.openEventId() != null) {
+                    alertSlots.add(
+                            new DashboardActiveAlertSlot(
+                                    String.valueOf(s.slotId()),
+                                    s.audioUrl(),
+                                    String.valueOf(s.openEventId()),
+                                    s.inputBitIndex()));
+                }
+            }
         }
+        body.put(
+                "alertAudio",
+                dashboardAlertAudioDirectorService.reconcileAndBuildInstruction(
+                        alertSlots, System.currentTimeMillis()));
         body.put("alertPlaybackLastEnded", dashboardPlaybackSyncService.lastClipEndSnapshot());
         return body;
     }

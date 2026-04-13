@@ -37,6 +37,12 @@ public class AppProperties {
     private int dashboardAlertMaxRepeats = 4;
 
     /**
+     * Silence on the server timeline after a clip ends before the next dashboard alert may be issued (while
+     * more clips are queued).
+     */
+    private int dashboardAlertGapMs = 400;
+
+    /**
      * If true, only one JVM may run per {@link #dataDir}; a second start opens the browser and exits.
      */
     private boolean singleInstance = false;
