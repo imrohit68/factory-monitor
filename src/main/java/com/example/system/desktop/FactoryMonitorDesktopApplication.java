@@ -3,14 +3,21 @@ package com.example.system.desktop;
 import com.example.system.MonitorApplication;
 import com.example.system.config.OperationMode;
 import com.example.system.config.SingleInstanceSupport;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
+import javafx.scene.control.PasswordField;
+import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
+import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
@@ -28,6 +35,7 @@ import javafx.scene.web.WebView;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
+import javafx.util.Duration;
 import netscape.javascript.JSObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,10 +45,17 @@ import org.springframework.context.ConfigurableApplicationContext;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
 import java.util.Base64;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -142,6 +157,12 @@ public class FactoryMonitorDesktopApplication extends Application {
     }
 
     private OperationMode showModeSelectionDialog(Stage ownerStage) {
+        Properties appProps = loadApplicationPropertiesForDesktop();
+        int timeoutSec = modeSelectionTimeoutSeconds(appProps);
+        String[] gate = resolveMaintenanceGateCredentials(appProps);
+        String gateUser = gate[0];
+        String gatePass = gate[1];
+
         Stage dialog = new Stage(StageStyle.TRANSPARENT);
         dialog.initModality(Modality.APPLICATION_MODAL);
         dialog.initOwner(ownerStage);
@@ -157,6 +178,12 @@ public class FactoryMonitorDesktopApplication extends Application {
         subtitle.setFont(Font.font("System", FontWeight.NORMAL, 13));
         subtitle.setTextFill(Color.web("#8fa3bf"));
 
+        AtomicInteger secondsLeft = new AtomicInteger(timeoutSec);
+        Label countdownLabel = new Label();
+        countdownLabel.setFont(Font.font("System", FontWeight.NORMAL, 13));
+        countdownLabel.setTextFill(Color.web("#94a8c4"));
+        countdownLabel.setText("Starting Production automatically in " + timeoutSec + "s…");
+
         VBox productionCard = buildModeCard(
                 "Production Mode",
                 "Connect to Modbus hardware.\nReads inputs from the physical device.",
@@ -169,21 +196,59 @@ public class FactoryMonitorDesktopApplication extends Application {
                 "#4c1d95");
 
         final OperationMode[] selected = {null};
+        final Timeline[] timelineRef = new Timeline[1];
+
+        Runnable restartCountdown =
+                () -> {
+                    secondsLeft.set(timeoutSec);
+                    countdownLabel.setText(
+                            "Starting Production automatically in " + timeoutSec + "s…");
+                    if (timelineRef[0] != null) {
+                        timelineRef[0].stop();
+                        timelineRef[0].playFromStart();
+                    }
+                };
+
+        timelineRef[0] =
+                new Timeline(
+                        new KeyFrame(
+                                Duration.seconds(1),
+                                e -> {
+                                    int left = secondsLeft.decrementAndGet();
+                                    if (left > 0) {
+                                        countdownLabel.setText(
+                                                "Starting Production automatically in " + left + "s…");
+                                    } else {
+                                        timelineRef[0].stop();
+                                        if (selected[0] == null) {
+                                            selected[0] = OperationMode.PRODUCTION;
+                                            dialog.close();
+                                        }
+                                    }
+                                }));
+        timelineRef[0].setCycleCount(Timeline.INDEFINITE);
+
         productionCard.setOnMouseClicked(
                 e -> {
+                    timelineRef[0].stop();
                     selected[0] = OperationMode.PRODUCTION;
                     dialog.close();
                 });
         maintenanceCard.setOnMouseClicked(
                 e -> {
-                    selected[0] = OperationMode.MAINTENANCE;
-                    dialog.close();
+                    timelineRef[0].stop();
+                    if (promptMaintenanceGate(dialog, gateUser, gatePass)) {
+                        selected[0] = OperationMode.MAINTENANCE;
+                        dialog.close();
+                    } else {
+                        restartCountdown.run();
+                    }
                 });
 
         HBox cards = new HBox(24, productionCard, maintenanceCard);
         cards.setAlignment(Pos.CENTER);
 
-        VBox root = new VBox(16, title, subtitle, cards);
+        VBox root = new VBox(16, title, subtitle, countdownLabel, cards);
         root.setAlignment(Pos.CENTER);
         root.setPadding(new Insets(40, 48, 40, 48));
         root.setStyle(
@@ -194,6 +259,7 @@ public class FactoryMonitorDesktopApplication extends Application {
         Scene scene = new Scene(root);
         scene.setFill(Color.TRANSPARENT);
         dialog.setScene(scene);
+        timelineRef[0].play();
         dialog.showAndWait();
         return selected[0];
     }
@@ -294,18 +360,123 @@ public class FactoryMonitorDesktopApplication extends Application {
                 .replace("\"", "&quot;");
     }
 
-    private static String resolveWindowTitle() {
-        Properties p = new Properties();
-        try (InputStream in =
-                Thread.currentThread()
-                        .getContextClassLoader()
-                        .getResourceAsStream("application.properties")) {
-            if (in != null) {
-                p.load(in);
+    /**
+     * Classpath {@code application.properties} merged with {@code user.dir/config/application.properties}
+     * when present (same overlay order Spring Boot uses for packaged installs).
+     */
+    private static Properties loadApplicationPropertiesForDesktop() {
+        Properties combined = new Properties();
+        ClassLoader[] loaders = {
+            Thread.currentThread().getContextClassLoader(),
+            FactoryMonitorDesktopApplication.class.getClassLoader()
+        };
+        for (ClassLoader cl : loaders) {
+            if (cl == null) {
+                continue;
             }
-        } catch (IOException e) {
-            log.debug("Could not load application.properties for title: {}", e.getMessage());
+            try (InputStream raw = cl.getResourceAsStream("application.properties")) {
+                if (raw == null) {
+                    continue;
+                }
+                try (InputStreamReader reader = new InputStreamReader(raw, StandardCharsets.UTF_8)) {
+                    combined.load(reader);
+                    break;
+                }
+            } catch (IOException e) {
+                log.debug("Could not load classpath application.properties: {}", e.getMessage());
+            }
         }
+        Path external = externalApplicationPropertiesPath();
+        if (external != null) {
+            try (Reader reader = Files.newBufferedReader(external, StandardCharsets.UTF_8)) {
+                Properties overlay = new Properties();
+                overlay.load(reader);
+                combined.putAll(overlay);
+            } catch (IOException e) {
+                log.warn("Could not read {}: {}", external, e.getMessage());
+            }
+        }
+        return combined;
+    }
+
+    private static Path externalApplicationPropertiesPath() {
+        String userDir = System.getProperty("user.dir");
+        if (userDir == null || userDir.isBlank()) {
+            return null;
+        }
+        Path p = Path.of(userDir, "config", "application.properties");
+        return Files.isRegularFile(p) ? p : null;
+    }
+
+    private static int modeSelectionTimeoutSeconds(Properties p) {
+        String raw = p.getProperty("system.desktop.mode-selection-timeout-seconds", "10");
+        try {
+            return Math.max(1, Integer.parseInt(raw.trim()));
+        } catch (NumberFormatException e) {
+            return 10;
+        }
+    }
+
+    private static String[] resolveMaintenanceGateCredentials(Properties props) {
+        String gateUser = trimOrEmpty(props.getProperty("system.desktop.maintenance-gate-username"));
+        String gatePass = trimOrEmpty(props.getProperty("system.desktop.maintenance-gate-password"));
+        if (gateUser.isEmpty()) {
+            gateUser = props.getProperty("system.security.initial-username", "admin");
+        }
+        if (gatePass.isEmpty()) {
+            gatePass = props.getProperty("system.security.initial-password", "admin@123");
+        }
+        return new String[] {gateUser, gatePass};
+    }
+
+    private static String trimOrEmpty(String s) {
+        return s == null ? "" : s.trim();
+    }
+
+    private static boolean constantTimeEquals(String a, String b) {
+        byte[] left = (a != null ? a : "").getBytes(StandardCharsets.UTF_8);
+        byte[] right = (b != null ? b : "").getBytes(StandardCharsets.UTF_8);
+        return MessageDigest.isEqual(left, right);
+    }
+
+    private static boolean promptMaintenanceGate(Stage owner, String expectedUser, String expectedPassword) {
+        Dialog<ButtonType> gateDialog = new Dialog<>();
+        gateDialog.initOwner(owner);
+        gateDialog.initModality(Modality.WINDOW_MODAL);
+        gateDialog.setTitle("Maintenance access");
+        gateDialog.setHeaderText("Enter credentials for Maintenance Mode");
+        gateDialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        TextField userField = new TextField();
+        PasswordField passField = new PasswordField();
+        grid.add(new Label("User ID:"), 0, 0);
+        grid.add(userField, 1, 0);
+        grid.add(new Label("Password:"), 0, 1);
+        grid.add(passField, 1, 1);
+        gateDialog.getDialogPane().setContent(grid);
+
+        Optional<ButtonType> result = gateDialog.showAndWait();
+        if (result.isEmpty() || result.get() != ButtonType.OK) {
+            return false;
+        }
+        if (constantTimeEquals(Objects.toString(userField.getText(), ""), expectedUser)
+                && constantTimeEquals(Objects.toString(passField.getText(), ""), expectedPassword)) {
+            return true;
+        }
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+        alert.initOwner(owner);
+        alert.setTitle("Maintenance access");
+        alert.setHeaderText(null);
+        alert.setContentText("Invalid user ID or password.");
+        alert.showAndWait();
+        return false;
+    }
+
+    private static String resolveWindowTitle() {
+        Properties p = loadApplicationPropertiesForDesktop();
         String name = p.getProperty("spring.application.name", "production-calling-system");
         return humanizeAppName(name);
     }

@@ -423,6 +423,8 @@ Function WriteAppConfig
   ${If} $UseExistingDataLock != "1"
     FileWrite $0 "system.security.initial-username=$InitialUser$\r$\n"
     FileWrite $0 "system.security.initial-password=$InitialPass$\r$\n"
+    FileWrite $0 "system.desktop.maintenance-gate-username=$InitialUser$\r$\n"
+    FileWrite $0 "system.desktop.maintenance-gate-password=$InitialPass$\r$\n"
   ${EndIf}
   FileWrite $0 "system.dashboard-alert-repeat-interval-minutes=$AlertRepeatMin$\r$\n"
   FileWrite $0 "system.dashboard-alert-max-repeats=$AlertMaxRepeats$\r$\n"
