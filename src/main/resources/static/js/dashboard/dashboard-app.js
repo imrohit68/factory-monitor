@@ -27,11 +27,14 @@
     };
     const SPEAKER_FRAME_COUNT = 26;
     const SPEAKER_FRAME_MS = 70;
-    /**
-     * Per-tab session snapshot (not shared across tabs) so each dashboard plays alerts independently.
-     * Still survives refresh and in-app navigation return within the same tab.
-     */
+    /** Shared activation snapshot so refresh, route return, and new tabs preserve the same ON episode. */
     const DASHBOARD_ALERT_ACTIVATION_KEY = 'dashboard-alert-activation-v1';
+    const DASHBOARD_ALERT_PLAYBACK_KEY = 'dashboard-alert-playback-v1';
+    const DASHBOARD_ALERT_PLAYBACK_CHANNEL = 'dashboard-alert-playback-v1';
+    const DASHBOARD_ALERT_PLAYBACK_PUBLISH_MS = 400;
+    const DASHBOARD_ALERT_PLAYBACK_SERVER_PUBLISH_MS = 800;
+    /** Must exceed dashboard poll interval (2s) and network slack; keep in line with server-side playback TTL. */
+    const DASHBOARD_ALERT_PLAYBACK_STALE_MS = 15000;
 
     const { createApp } = Vue;
 
@@ -84,8 +87,18 @@
                 _replayTimerByKey: {},
                 // Number of repeats already queued/played per active key (resets on OFF->ON).
                 _replayCountByKey: {},
-                /** Mirrors activation snapshot when sessionStorage is unavailable (e.g. JavaFX WebView). */
+                /** Mirrors activation snapshot when localStorage is unavailable (e.g. JavaFX WebView). */
                 _activationSnapshotMemory: {},
+                _playbackSyncChannel: null,
+                _playbackSyncSenderId:
+                    'dashboard-tab-' + Date.now() + '-' + Math.random().toString(36).slice(2),
+                _playbackSyncPublishTimer: null,
+                _lastServerPlaybackPublishAt: 0,
+                _serverPlaybackState: null,
+                /** serverTimeMs from last /api/dashboard minus local Date.now() — aligns playback sync across hosts/clocks. */
+                _serverTimeSkewMs: 0,
+                _storagePlaybackHandler: null,
+                _broadcastPlaybackHandler: null,
                 _pollInterval: null,
                 _visibilityHandler: null,
                 _beforeUnloadHandler: null,
@@ -116,6 +129,7 @@
         mounted() {
             this.refresh();
             this._pollInterval = setInterval(() => this.refresh(), 2000);
+            this.setupPlaybackSync();
             
             this._visibilityHandler = () => {
                 if (document.hidden) {
@@ -153,6 +167,7 @@
             console.log('Component unmounting');
             this.stopSpeakerAnimation();
             this.stopAlertAudio();
+            this.teardownPlaybackSync();
             if (this._pollInterval) {
                 clearInterval(this._pollInterval);
                 this._pollInterval = null;
@@ -355,6 +370,26 @@
                     return String(url);
                 }
             },
+            /** Path + query only so 127.0.0.1 vs localhost (and other same-resource URLs) still match for sync. */
+            normalizeAudioUrlPathKey(url) {
+                if (url == null || url === '') {
+                    return '';
+                }
+                try {
+                    const u = new URL(url, window.location.href);
+                    let path = u.pathname + u.search;
+                    if (path !== '' && !path.startsWith('/')) {
+                        path = '/' + path;
+                    }
+                    return path;
+                } catch (e) {
+                    const s = String(url);
+                    return s.startsWith('/') ? s : '/' + s;
+                }
+            },
+            alignedNowMs() {
+                return Date.now() + (typeof this._serverTimeSkewMs === 'number' ? this._serverTimeSkewMs : 0);
+            },
             audioSrcMatches(audioEl, url) {
                 if (!audioEl) {
                     return false;
@@ -422,14 +457,261 @@
                     this._repeatTimer = null;
                 }
             },
+            setupPlaybackSync() {
+                if (typeof window !== 'undefined') {
+                    this._storagePlaybackHandler = (e) => {
+                        if (e.key !== DASHBOARD_ALERT_PLAYBACK_KEY || !e.newValue) return;
+                        this.onSharedPlaybackSignal(e.newValue);
+                    };
+                    window.addEventListener('storage', this._storagePlaybackHandler);
+                }
+                if (typeof BroadcastChannel !== 'undefined') {
+                    try {
+                        this._playbackSyncChannel = new BroadcastChannel(DASHBOARD_ALERT_PLAYBACK_CHANNEL);
+                        this._broadcastPlaybackHandler = (e) => this.onSharedPlaybackSignal(e && e.data);
+                        this._playbackSyncChannel.addEventListener('message', this._broadcastPlaybackHandler);
+                    } catch (e) {
+                        console.warn('Failed to open dashboard playback sync channel:', e);
+                        this._playbackSyncChannel = null;
+                        this._broadcastPlaybackHandler = null;
+                    }
+                }
+            },
+            teardownPlaybackSync() {
+                this.clearPlaybackSyncPublisher();
+                if (this._playbackSyncChannel && this._broadcastPlaybackHandler) {
+                    this._playbackSyncChannel.removeEventListener('message', this._broadcastPlaybackHandler);
+                }
+                if (this._playbackSyncChannel) {
+                    try {
+                        this._playbackSyncChannel.close();
+                    } catch (e) {
+                        /* ignore */
+                    }
+                    this._playbackSyncChannel = null;
+                }
+                this._broadcastPlaybackHandler = null;
+                if (typeof window !== 'undefined' && this._storagePlaybackHandler) {
+                    window.removeEventListener('storage', this._storagePlaybackHandler);
+                }
+                this._storagePlaybackHandler = null;
+            },
+            normalizePlaybackState(raw) {
+                if (!raw) return null;
+                let parsed = raw;
+                if (typeof raw === 'string') {
+                    try {
+                        parsed = JSON.parse(raw);
+                    } catch (e) {
+                        return null;
+                    }
+                }
+                if (!parsed || typeof parsed !== 'object') return null;
+                const key = parsed.key == null || parsed.key === '' ? null : String(parsed.key);
+                const url = this.normalizeAudioUrl(parsed.url);
+                const activationId =
+                    parsed.activationId == null || parsed.activationId === ''
+                        ? null
+                        : String(parsed.activationId);
+                const wallClockStartMs = Number(parsed.wallClockStartMs);
+                const updatedAtMs = Number(parsed.updatedAtMs);
+                const senderId =
+                    parsed.senderId == null || parsed.senderId === ''
+                        ? null
+                        : String(parsed.senderId);
+                if (!key || !url) return null;
+                if (!Number.isFinite(wallClockStartMs) || !Number.isFinite(updatedAtMs)) return null;
+                return {
+                    key,
+                    url,
+                    activationId,
+                    wallClockStartMs,
+                    updatedAtMs,
+                    senderId
+                };
+            },
+            readSharedPlaybackState() {
+                if (typeof window === 'undefined' || !window.localStorage) {
+                    return null;
+                }
+                try {
+                    return this.normalizePlaybackState(window.localStorage.getItem(DASHBOARD_ALERT_PLAYBACK_KEY));
+                } catch (e) {
+                    console.warn('Failed to read shared dashboard playback state:', e);
+                    return null;
+                }
+            },
+            bestSharedPlaybackState() {
+                let best = null;
+                for (const candidate of arguments) {
+                    const normalized = this.normalizePlaybackState(candidate);
+                    if (!normalized || !this.isPlaybackStateFresh(normalized)) {
+                        continue;
+                    }
+                    if (!best || normalized.updatedAtMs > best.updatedAtMs) {
+                        best = normalized;
+                    }
+                }
+                return best;
+            },
+            writeSharedPlaybackState(state) {
+                if (!state) {
+                    return;
+                }
+                if (typeof window !== 'undefined' && window.localStorage) {
+                    const payload = JSON.stringify(state);
+                    try {
+                        window.localStorage.setItem(DASHBOARD_ALERT_PLAYBACK_KEY, payload);
+                    } catch (e) {
+                        console.warn('Failed to write shared dashboard playback state:', e);
+                    }
+                }
+                if (this._playbackSyncChannel) {
+                    try {
+                        this._playbackSyncChannel.postMessage(state);
+                    } catch (e) {
+                        console.warn('Failed to broadcast dashboard playback state:', e);
+                    }
+                }
+            },
+            async publishPlaybackStateToServer(state) {
+                if (!state) {
+                    return;
+                }
+                try {
+                    await fetch('/api/dashboard/playback-sync', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(state)
+                    });
+                } catch (e) {
+                    console.warn('Failed to publish dashboard playback state to server:', e);
+                }
+            },
+            async clearPlaybackStateOnServer() {
+                if (!this._playbackSyncSenderId) {
+                    return;
+                }
+                try {
+                    await fetch('/api/dashboard/playback-sync/clear', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ senderId: this._playbackSyncSenderId })
+                    });
+                } catch (e) {
+                    console.warn('Failed to clear dashboard playback state on server:', e);
+                }
+            },
+            isPlaybackStateFresh(state) {
+                if (!state) return false;
+                const ageMs = this.alignedNowMs() - state.updatedAtMs;
+                return ageMs >= -1000 && ageMs <= DASHBOARD_ALERT_PLAYBACK_STALE_MS;
+            },
+            samePlaybackActivation(state, item) {
+                if (!state || !item) return false;
+                if (String(state.key) !== String(item.key)) return false;
+                if (this.normalizeAudioUrlPathKey(state.url) !== this.normalizeAudioUrlPathKey(item.url)) {
+                    return false;
+                }
+                const stateActivation = state.activationId == null ? null : String(state.activationId);
+                const itemActivation = item.activationId == null ? null : String(item.activationId);
+                return stateActivation === itemActivation;
+            },
+            computeJoinSeekSeconds(state) {
+                if (!state) return null;
+                const target = (this.alignedNowMs() - state.wallClockStartMs) / 1000;
+                if (!Number.isFinite(target) || target < 0) {
+                    return null;
+                }
+                return target;
+            },
+            publishPlaybackState(item, currentTimeSeconds) {
+                if (!item) return;
+                const now = Date.now();
+                const currentSec =
+                    Number.isFinite(currentTimeSeconds) && currentTimeSeconds >= 0
+                        ? currentTimeSeconds
+                        : 0;
+                const pathKey = this.normalizeAudioUrlPathKey(item.url);
+                const state = {
+                    key: String(item.key),
+                    url: pathKey || this.normalizeAudioUrl(item.url),
+                    activationId: item.activationId == null ? null : String(item.activationId),
+                    wallClockStartMs: now - Math.round(currentSec * 1000),
+                    updatedAtMs: now,
+                    senderId: this._playbackSyncSenderId
+                };
+                if (!document.hidden) {
+                    this.writeSharedPlaybackState(state);
+                }
+                this._serverPlaybackState = state;
+                if (
+                    this._lastServerPlaybackPublishAt === 0 ||
+                    (now - this._lastServerPlaybackPublishAt) >= DASHBOARD_ALERT_PLAYBACK_SERVER_PUBLISH_MS
+                ) {
+                    this._lastServerPlaybackPublishAt = now;
+                    void this.publishPlaybackStateToServer(state);
+                }
+            },
+            clearPlaybackSyncPublisher() {
+                if (this._playbackSyncPublishTimer != null) {
+                    clearInterval(this._playbackSyncPublishTimer);
+                    this._playbackSyncPublishTimer = null;
+                }
+            },
+            startPlaybackSyncPublisher(item, initialCurrentTimeSeconds) {
+                this.clearPlaybackSyncPublisher();
+                let firstTick = true;
+                const publish = () => {
+                    if (this.playingKey !== item.key) return;
+                    const a = this._audioEl;
+                    if (!a) return;
+                    let currentTimeSeconds =
+                        Number.isFinite(a.currentTime) && a.currentTime >= 0 ? a.currentTime : 0;
+                    if (
+                        firstTick &&
+                        Number.isFinite(initialCurrentTimeSeconds) &&
+                        initialCurrentTimeSeconds > currentTimeSeconds
+                    ) {
+                        currentTimeSeconds = initialCurrentTimeSeconds;
+                    }
+                    this.publishPlaybackState(item, currentTimeSeconds);
+                    firstTick = false;
+                };
+                publish();
+                this._playbackSyncPublishTimer = setInterval(
+                    publish,
+                    DASHBOARD_ALERT_PLAYBACK_PUBLISH_MS
+                );
+            },
+            maybeJoinFromPlaybackState(state) {
+                if (document.hidden) return false;
+                const normalized = this.normalizePlaybackState(state);
+                if (!normalized || !this.isPlaybackStateFresh(normalized)) {
+                    return false;
+                }
+                if (normalized.senderId === this._playbackSyncSenderId) {
+                    return false;
+                }
+                const item = this.getActiveAudioItemByKey(normalized.key);
+                if (!item) return false;
+                if (!this.samePlaybackActivation(normalized, item)) return false;
+                if (this.playingKey != null) return false;
+                if (this._queuedKeys[item.key]) return false;
+                this.playAlertItem(item, { syncState: normalized });
+                return true;
+            },
+            onSharedPlaybackSignal(rawState) {
+                this.maybeJoinFromPlaybackState(rawState);
+            },
             readPersistedActivationSnapshot() {
                 const mem = this._activationSnapshotMemory && typeof this._activationSnapshotMemory === 'object'
                     ? this._activationSnapshotMemory
                     : {};
                 let fromDisk = {};
-                if (typeof window !== 'undefined' && window.sessionStorage) {
+                if (typeof window !== 'undefined' && window.localStorage) {
                     try {
-                        const raw = window.sessionStorage.getItem(DASHBOARD_ALERT_ACTIVATION_KEY);
+                        const raw = window.localStorage.getItem(DASHBOARD_ALERT_ACTIVATION_KEY);
                         if (raw) {
                             const parsed = JSON.parse(raw);
                             const byKey = parsed && typeof parsed === 'object' ? parsed.byKey : null;
@@ -465,11 +747,11 @@
                     };
                 }
                 this._activationSnapshotMemory = normalized;
-                if (typeof window === 'undefined' || !window.sessionStorage) {
+                if (typeof window === 'undefined' || !window.localStorage) {
                     return;
                 }
                 try {
-                    window.sessionStorage.setItem(
+                    window.localStorage.setItem(
                         DASHBOARD_ALERT_ACTIVATION_KEY,
                         JSON.stringify({ byKey: normalized })
                     );
@@ -481,7 +763,7 @@
                 if (!persistedEntry || !item) {
                     return false;
                 }
-                if (this.normalizeAudioUrl(persistedEntry.url) !== this.normalizeAudioUrl(item.url)) {
+                if (this.normalizeAudioUrlPathKey(persistedEntry.url) !== this.normalizeAudioUrlPathKey(item.url)) {
                     return false;
                 }
                 const a = item.activationId == null ? null : String(item.activationId);
@@ -505,6 +787,10 @@
                 console.log('Stopping audio playback');
                 this.showAudioGestureHint = false;
                 this.clearAlertGapTimer();
+                this.clearPlaybackSyncPublisher();
+                this._lastServerPlaybackPublishAt = 0;
+                this._serverPlaybackState = null;
+                void this.clearPlaybackStateOnServer();
                 if (this._currentPlayGuard) this._currentPlayGuard.cancelled = true;
                 if (this._playWatchdogTimer != null) {
                     clearTimeout(this._playWatchdogTimer);
@@ -531,9 +817,11 @@
                 }
                 this._replayCountByKey = {};
             },
-            playAlertItem(item) {
+            playAlertItem(item, options) {
                 if (!item) return;
                 if (this.playingKey != null) return;
+                const syncState =
+                    options && options.syncState ? this.normalizePlaybackState(options.syncState) : null;
 
                 const a = this.ensureAudioElement();
                 a.loop = false;
@@ -580,16 +868,6 @@
                     }
                 };
 
-                if (a.duration && Number.isFinite(a.duration)) {
-                    armWatchdog(a.duration);
-                } else {
-                    const onMeta = () => {
-                        a.removeEventListener('loadedmetadata', onMeta);
-                        armWatchdog(a.duration);
-                    };
-                    a.addEventListener('loadedmetadata', onMeta);
-                }
-
                 const onEndedOnce = () => {
                     a.removeEventListener('ended', onEndedOnce);
                     if (guard.cancelled) return;
@@ -598,15 +876,70 @@
                 };
                 a.addEventListener('ended', onEndedOnce);
 
-                this.notifyPlayAttemptWithHandlers(
-                    a.play(),
-                    () => { this._lastPlayedByKey[item.key] = Date.now(); },
-                    (err) => {
-                        guard.cancelled = true;
-                        clearWatchdog();
-                        if (this.playingKey === item.key) this.playingKey = null;
+                const beginPlayback = (initialCurrentTimeSeconds) => {
+                    if (guard.cancelled) return;
+                    if (a.duration && Number.isFinite(a.duration)) {
+                        armWatchdog(a.duration);
+                    } else {
+                        const onMeta = () => {
+                            a.removeEventListener('loadedmetadata', onMeta);
+                            armWatchdog(a.duration);
+                        };
+                        a.addEventListener('loadedmetadata', onMeta);
                     }
-                );
+
+                    this.notifyPlayAttemptWithHandlers(
+                        a.play(),
+                        () => {
+                            this._lastPlayedByKey[item.key] = Date.now();
+                            this.startPlaybackSyncPublisher(item, initialCurrentTimeSeconds);
+                        },
+                        () => {
+                            guard.cancelled = true;
+                            clearWatchdog();
+                            this.clearPlaybackSyncPublisher();
+                            if (this.playingKey === item.key) this.playingKey = null;
+                        }
+                    );
+                };
+
+                if (syncState && this.samePlaybackActivation(syncState, item)) {
+                    const startJoinedPlayback = () => {
+                        if (guard.cancelled) return;
+                        let joinSeconds = this.computeJoinSeekSeconds(syncState);
+                        if (!Number.isFinite(joinSeconds) || joinSeconds < 0) {
+                            joinSeconds = 0;
+                        }
+                        if (Number.isFinite(a.duration) && a.duration > 0) {
+                            if (joinSeconds >= a.duration) {
+                                guard.cancelled = true;
+                                a.removeEventListener('ended', onEndedOnce);
+                                clearWatchdog();
+                                if (this.playingKey === item.key) this.playingKey = null;
+                                return;
+                            }
+                            joinSeconds = Math.min(joinSeconds, Math.max(0, a.duration - 0.05));
+                        }
+                        try {
+                            a.currentTime = joinSeconds;
+                        } catch (e) {
+                            /* ignore */
+                        }
+                        beginPlayback(joinSeconds);
+                    };
+                    if (a.readyState >= 1) {
+                        startJoinedPlayback();
+                    } else {
+                        const onMeta = () => {
+                            a.removeEventListener('loadedmetadata', onMeta);
+                            startJoinedPlayback();
+                        };
+                        a.addEventListener('loadedmetadata', onMeta);
+                    }
+                    return;
+                }
+
+                beginPlayback(0);
             },
             tryPlayNextFromQueue() {
                 // Never overlap: if currently playing, do nothing.
@@ -669,6 +1002,10 @@
                         /* ignore */
                     }
                 }
+                this.clearPlaybackSyncPublisher();
+                this._lastServerPlaybackPublishAt = 0;
+                this._serverPlaybackState = null;
+                void this.clearPlaybackStateOnServer();
                 const endedKey = this.playingKey;
                 console.log('Audio ended, playingKey:', endedKey);
                 this.playingKey = null;
@@ -728,7 +1065,7 @@
                     return;
                 }
 
-                // Per-tab snapshot so refresh / route return in this tab does not look like OFF->ON again.
+                // Shared snapshot so refresh, route return, and new tabs keep the same ON episode.
                 const prevPersisted = this.readPersistedActivationSnapshot();
                 const activeByKey = {};
                 const activeNowSet = new Set();
@@ -757,10 +1094,16 @@
                     delete this._queuedKeys[key];
                 }
 
+                const sharedPlayback = this.bestSharedPlaybackState(
+                    this.readSharedPlaybackState(),
+                    this._serverPlaybackState
+                );
+
                 // ON transitions: enqueue immediate playback for newly active keys (new activation or new URL).
                 for (const item of pl) {
                     const wasActive = this.sameActivationPersisted(prevPersisted[item.key], item);
                     if (wasActive) continue;
+                    if (sharedPlayback && this.samePlaybackActivation(sharedPlayback, item)) continue;
 
                     // If a timer exists (e.g., due to timing races), clear it; new timer starts after this playback ends.
                     if (this._replayTimerByKey[item.key] != null) {
@@ -788,6 +1131,18 @@
                 // Deterministic ordering: by bit then key.
                 if (this._playQueue.length) {
                     this._playQueue.sort((a, b) => a.bit - b.bit || String(a.key).localeCompare(String(b.key)));
+                }
+                if (sharedPlayback) {
+                    const sharedItem = activeByKey[sharedPlayback.key];
+                    if (
+                        sharedItem &&
+                        (
+                            this.sameActivationPersisted(prevPersisted[sharedItem.key], sharedItem) ||
+                            this.samePlaybackActivation(sharedPlayback, sharedItem)
+                        )
+                    ) {
+                        this.maybeJoinFromPlaybackState(sharedPlayback);
+                    }
                 }
 
                 // Start next item if nothing is playing.
@@ -818,6 +1173,10 @@
                     if (typeof j.alertMaxRepeats === 'number' && j.alertMaxRepeats >= 0) {
                         this.maxAlertRepeats = j.alertMaxRepeats;
                     }
+                    if (typeof j.serverTimeMs === 'number' && Number.isFinite(j.serverTimeMs)) {
+                        this._serverTimeSkewMs = j.serverTimeMs - Date.now();
+                    }
+                    this._serverPlaybackState = this.normalizePlaybackState(j.playbackSync);
 
                     if (document.hidden) {
                         console.log('Page hidden, stopping audio');

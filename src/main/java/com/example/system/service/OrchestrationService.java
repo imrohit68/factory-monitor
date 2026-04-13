@@ -4,6 +4,7 @@ import com.example.system.config.ApplicationOperationMode;
 import com.example.system.config.AppProperties;
 import com.example.system.config.ModbusProperties;
 import com.example.system.domain.WorkstationSlot;
+import com.example.system.dto.DashboardPlaybackSyncDto;
 import com.example.system.dto.DashboardSlotDto;
 import com.example.system.dto.DashboardWorkstationDto;
 import com.example.system.modbus.ModbusMasterService;
@@ -33,6 +34,7 @@ public class OrchestrationService {
     private final SimulationInputService simulationInputService;
     private final WorkstationService workstationService;
     private final AppProperties appProperties;
+    private final DashboardPlaybackSyncService dashboardPlaybackSyncService;
 
     private final ConcurrentMap<Long, ChannelFsm> channelBySlotId = new ConcurrentHashMap<>();
     private final ConcurrentMap<Long, Long> openEventIdsBySlotId = new ConcurrentHashMap<>();
@@ -44,7 +46,8 @@ public class OrchestrationService {
             EventPersistenceService persistence,
             SimulationInputService simulationInputService,
             WorkstationService workstationService,
-            AppProperties appProperties) {
+            AppProperties appProperties,
+            DashboardPlaybackSyncService dashboardPlaybackSyncService) {
         this.modbus = modbus;
         this.modbusMaster = modbusMaster;
         this.applicationOperationMode = applicationOperationMode;
@@ -52,6 +55,7 @@ public class OrchestrationService {
         this.simulationInputService = simulationInputService;
         this.workstationService = workstationService;
         this.appProperties = appProperties;
+        this.dashboardPlaybackSyncService = dashboardPlaybackSyncService;
     }
 
     @Scheduled(fixedDelayString = "${system.modbus.poll-interval-ms:5000}")
@@ -179,6 +183,11 @@ public class OrchestrationService {
         body.put("mode", applicationOperationMode.getCurrentMode().name());
         body.put("alertRepeatIntervalMinutes", appProperties.getDashboardAlertRepeatIntervalMinutes());
         body.put("alertMaxRepeats", appProperties.getDashboardAlertMaxRepeats());
+        body.put("serverTimeMs", System.currentTimeMillis());
+        DashboardPlaybackSyncDto playbackSync = dashboardPlaybackSyncService.snapshot();
+        if (playbackSync != null) {
+            body.put("playbackSync", playbackSync);
+        }
         return body;
     }
 }

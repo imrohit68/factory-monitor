@@ -57,6 +57,8 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.ignoringRequestMatchers(
                         "/admin/workstations/audio-preview",
                         "/admin/workstations/audio-preview/**",
+                        "/api/dashboard/playback-sync",
+                        "/api/dashboard/playback-sync/clear",
                         "/api/dashboard/simulation/toggle/**"));
         return http.build();
     }
