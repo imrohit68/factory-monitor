@@ -133,14 +133,13 @@
             
             this._visibilityHandler = () => {
                 if (document.hidden) {
-                    console.log('Page hidden event');
-                    this.stopAlertAudio();
-                } else {
-                    console.log('Page visible event, syncing audio');
-                    // Background tabs throttle timers; refresh immediately when user returns.
-                    this.refresh();
-                    this.syncAlertAudioPlaylist(this.workstations);
+                    console.log('Page hidden event (alert audio continues in background)');
+                    return;
                 }
+                console.log('Page visible event, syncing audio');
+                // Background tabs throttle timers; refresh immediately when user returns.
+                this.refresh();
+                this.syncAlertAudioPlaylist(this.workstations);
             };
             document.addEventListener('visibilitychange', this._visibilityHandler);
             
@@ -641,9 +640,7 @@
                     updatedAtMs: now,
                     senderId: this._playbackSyncSenderId
                 };
-                if (!document.hidden) {
-                    this.writeSharedPlaybackState(state);
-                }
+                this.writeSharedPlaybackState(state);
                 this._serverPlaybackState = state;
                 if (
                     this._lastServerPlaybackPublishAt === 0 ||
@@ -685,7 +682,6 @@
                 );
             },
             maybeJoinFromPlaybackState(state) {
-                if (document.hidden) return false;
                 const normalized = this.normalizePlaybackState(state);
                 if (!normalized || !this.isPlaybackStateFresh(normalized)) {
                     return false;
@@ -1023,9 +1019,6 @@
                     this._replayTimerByKey[endedKey] = setTimeout(() => {
                         this._replayTimerByKey[endedKey] = null;
 
-                        // If tab is hidden, don't start new audio.
-                        if (document.hidden) return;
-
                         // Replay only if the switch is still ON and we have an active audio URL.
                         const item = this.getActiveAudioItemByKey(endedKey);
                         if (!item) return;
@@ -1178,12 +1171,7 @@
                     }
                     this._serverPlaybackState = this.normalizePlaybackState(j.playbackSync);
 
-                    if (document.hidden) {
-                        console.log('Page hidden, stopping audio');
-                        this.stopAlertAudio();
-                    } else {
-                        this.syncAlertAudioPlaylist(next);
-                    }
+                    this.syncAlertAudioPlaylist(next);
                     
                     this.modbusConnected = !!j.modbusConnected;
                     this.modbusError = j.modbusError || null;
