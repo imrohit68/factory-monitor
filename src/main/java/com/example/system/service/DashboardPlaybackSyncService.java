@@ -58,10 +58,6 @@ public class DashboardPlaybackSyncService {
     }
 
     /**
-     * For each active slot with a clip-end marker, if the repeat interval has passed since that end, bump the
-     * replay epoch at most once per distinct {@code endedAtMs} value.
-     */
-    /**
      * Advances replay epochs where the repeat interval has elapsed; returns keys whose epoch was bumped on this
      * call (at most once per distinct {@code endedAtMs} per key).
      */

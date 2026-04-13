@@ -28,6 +28,7 @@ public class DashboardController {
         model.addAttribute("modbusError", orchestration.getModbusLastError());
         model.addAttribute("alertRepeatIntervalMinutes", appProperties.getDashboardAlertRepeatIntervalMinutes());
         model.addAttribute("alertMaxRepeats", appProperties.getDashboardAlertMaxRepeats());
+        model.addAttribute("alertGapMs", appProperties.getDashboardAlertGapMs());
         return "dashboard";
     }
 }

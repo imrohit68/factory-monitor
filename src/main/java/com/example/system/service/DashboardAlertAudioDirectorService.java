@@ -121,6 +121,7 @@ public class DashboardAlertAudioDirectorService {
             if (inFlight != null && !activeKeys.contains(inFlight.slotKey())) {
                 inFlight = null;
             }
+            expireInFlightIfStale(nowMs);
 
             int maxRepeats = Math.max(0, appProperties.getDashboardAlertMaxRepeats());
 
@@ -248,6 +249,20 @@ public class DashboardAlertAudioDirectorService {
         }
     }
 
+    /** Clears stuck in-flight when clip-ended POST never arrives (tab closed, network error, etc.). */
+    private void expireInFlightIfStale(long nowMs) {
+        if (inFlight == null) {
+            return;
+        }
+        int timeoutMs = appProperties.getDashboardAlertInFlightTimeoutMs();
+        if (timeoutMs <= 0) {
+            return;
+        }
+        if (nowMs - inFlight.issuedAtMs() >= timeoutMs) {
+            inFlight = null;
+        }
+    }
+
     private Map<String, Object> materializeInstruction(long nowMs) {
         Map<String, Object> out = new LinkedHashMap<>();
         if (inFlight != null) {
@@ -275,7 +290,13 @@ public class DashboardAlertAudioDirectorService {
         }
         long seq = nextPlaySequence++;
         inFlight = new InFlight(
-                next.slotKey(), next.audioUrl(), next.activationId(), next.inputBitIndex(), seq, next.reason());
+                next.slotKey(),
+                next.audioUrl(),
+                next.activationId(),
+                next.inputBitIndex(),
+                seq,
+                next.reason(),
+                nowMs);
         out.put("sequence", seq);
         out.put("action", ACTION_PLAY);
         out.put("slotKey", inFlight.slotKey());
@@ -310,5 +331,6 @@ public class DashboardAlertAudioDirectorService {
             String activationId,
             int inputBitIndex,
             long sequence,
-            String reason) {}
+            String reason,
+            long issuedAtMs) {}
 }

@@ -43,6 +43,13 @@ public class AppProperties {
     private int dashboardAlertGapMs = 400;
 
     /**
+     * If no matching clip-ended POST arrives within this many milliseconds after the server issues a PLAY
+     * instruction, the in-flight play is discarded so the queue can advance (tab killed, network loss, etc.).
+     * {@code 0} disables this safety timeout.
+     */
+    private int dashboardAlertInFlightTimeoutMs = 180_000;
+
+    /**
      * If true, only one JVM may run per {@link #dataDir}; a second start opens the browser and exits.
      */
     private boolean singleInstance = false;
