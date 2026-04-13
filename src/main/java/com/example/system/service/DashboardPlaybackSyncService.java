@@ -1,11 +1,13 @@
 package com.example.system.service;
 
+import com.example.system.dto.DashboardPlaybackEndedDto;
 import com.example.system.dto.DashboardPlaybackSyncClearDto;
 import com.example.system.dto.DashboardPlaybackSyncDto;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -16,6 +18,11 @@ public class DashboardPlaybackSyncService {
     private static final long STALE_MS = 15000;
 
     private final Map<String, DashboardPlaybackSyncDto> playbackBySenderId = new ConcurrentHashMap<>();
+
+    /** Latest clip end per slot key so new clients do not replay the same openEventId until repeat interval. */
+    private final Map<String, ClipEndMarker> lastClipEndBySlotKey = new ConcurrentHashMap<>();
+
+    private record ClipEndMarker(String activationId, long endedAtMs) {}
 
     public DashboardPlaybackSyncDto snapshot() {
         pruneStale();
@@ -50,6 +57,7 @@ public class DashboardPlaybackSyncService {
                         rebasedWallStart,
                         serverNow);
         playbackBySenderId.put(senderId, normalized);
+        lastClipEndBySlotKey.remove(key);
         pruneStale();
     }
 
@@ -62,6 +70,34 @@ public class DashboardPlaybackSyncService {
             return;
         }
         playbackBySenderId.remove(senderId);
+    }
+
+    public void recordClipEnded(DashboardPlaybackEndedDto dto) {
+        if (dto == null) {
+            return;
+        }
+        String key = normalize(dto.key());
+        String activationId = normalize(dto.activationId());
+        if (key == null || activationId == null) {
+            return;
+        }
+        lastClipEndBySlotKey.put(key, new ClipEndMarker(activationId, System.currentTimeMillis()));
+    }
+
+    /** For {@code GET /api/dashboard} — nested maps serialize cleanly to JSON. */
+    public Map<String, Map<String, Object>> lastClipEndSnapshot() {
+        Map<String, Map<String, Object>> out = new HashMap<>();
+        for (var e : lastClipEndBySlotKey.entrySet()) {
+            ClipEndMarker m = e.getValue();
+            if (m == null) {
+                continue;
+            }
+            Map<String, Object> row = new HashMap<>();
+            row.put("activationId", m.activationId());
+            row.put("endedAtMs", m.endedAtMs());
+            out.put(e.getKey(), row);
+        }
+        return out;
     }
 
     private void pruneStale() {

@@ -27,6 +27,10 @@
             var tried = false;
             function tryFullscreen() {
                 if (tried || document.fullscreenElement || document.hidden) return;
+                /* Let the dashboard consume the first gesture for HTMLMediaElement autoplay when needed. */
+                if (document.body && document.body.getAttribute('data-audio-gesture-pending') === '1') {
+                    return;
+                }
                 var el = document.documentElement;
                 if (!el.requestFullscreen) return;
                 tried = true;
@@ -60,6 +64,23 @@
 
 <div id="app" class="h-screen flex flex-col min-h-0" v-cloak
      th:attr="data-modbus-connected=${modbusConnected},data-modbus-error=${modbusError != null ? modbusError : ''},data-alert-repeat-interval-minutes=${alertRepeatIntervalMinutes},data-alert-max-repeats=${alertMaxRepeats}">
+
+    <!-- Captures the first tap for autoplay unlock (above links/matrix); fullscreen script defers while this shows. -->
+    <div
+            v-if="showAudioGestureHint"
+            ref="gestureOverlay"
+            class="fixed inset-0 z-[300] flex flex-col items-center justify-center gap-4 bg-black/40 px-6 text-center cursor-pointer touch-manipulation"
+            role="button"
+            tabindex="0"
+            aria-label="Tap to enable alert sounds"
+            @pointerdown.prevent.stop="resumeAudioAfterUserGesture"
+            @keydown.enter.prevent.stop="resumeAudioAfterUserGesture"
+            @keydown.space.prevent.stop="resumeAudioAfterUserGesture">
+        <div class="max-w-md rounded-xl border border-blue-200 bg-blue-50 px-6 py-5 shadow-lg pointer-events-none">
+            <p class="text-base font-bold text-blue-950">Enable alert sounds</p>
+            <p class="mt-2 text-sm font-medium text-blue-900">Tap anywhere on this dimmed area. Your first tap unlocks audio so alerts stay in sync with other screens.</p>
+        </div>
+    </div>
 
     <!-- Top bar -->
     <header class="app-nav-bar px-5 sm:px-8 py-5 sm:py-6 flex items-center justify-between shrink-0 relative z-20 gap-5 sm:gap-7">

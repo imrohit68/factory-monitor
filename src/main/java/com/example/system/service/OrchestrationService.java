@@ -188,6 +188,7 @@ public class OrchestrationService {
         if (playbackSync != null) {
             body.put("playbackSync", playbackSync);
         }
+        body.put("alertPlaybackLastEnded", dashboardPlaybackSyncService.lastClipEndSnapshot());
         return body;
     }
 }

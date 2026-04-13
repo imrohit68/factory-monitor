@@ -95,6 +95,8 @@
                 _playbackSyncPublishTimer: null,
                 _lastServerPlaybackPublishAt: 0,
                 _serverPlaybackState: null,
+                /** Per slot key: { activationId, endedAtMs } from server so new tabs skip replay until repeat interval. */
+                _serverPlaybackLastEnded: {},
                 /** serverTimeMs from last /api/dashboard minus local Date.now() — aligns playback sync across hosts/clocks. */
                 _serverTimeSkewMs: 0,
                 _storagePlaybackHandler: null,
@@ -616,13 +618,36 @@
                 const itemActivation = item.activationId == null ? null : String(item.activationId);
                 return stateActivation === itemActivation;
             },
-            computeJoinSeekSeconds(state) {
-                if (!state) return null;
-                const target = (this.alignedNowMs() - state.wallClockStartMs) / 1000;
-                if (!Number.isFinite(target) || target < 0) {
-                    return null;
+            /**
+             * Another client (e.g. desktop app) already finished this clip for the same openEventId; do not start
+             * from 0 on this tab until the repeat window passes or a new publish clears the marker.
+             */
+            shouldSkipInitialPlayDueToServerEndedCooldown(item, sharedPlayback) {
+                if (!item) return false;
+                if (sharedPlayback && this.samePlaybackActivation(sharedPlayback, item)) return false;
+                const row = this._serverPlaybackLastEnded && this._serverPlaybackLastEnded[item.key];
+                if (!row || item.activationId == null || row.activationId == null) return false;
+                if (String(row.activationId) !== String(item.activationId)) return false;
+                const endedAt = Number(row.endedAtMs);
+                if (!Number.isFinite(endedAt)) return false;
+                const repeatMs =
+                    typeof this.repeatEveryMs === 'number' ? this.repeatEveryMs : 15 * 60 * 1000;
+                return this.alignedNowMs() < endedAt + repeatMs;
+            },
+            async notifyServerClipEnded(item) {
+                if (!item || item.activationId == null) return;
+                try {
+                    await fetch('/api/dashboard/playback-sync/ended', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            key: String(item.key),
+                            activationId: String(item.activationId)
+                        })
+                    });
+                } catch (e) {
+                    console.warn('Failed to record alert clip end on server:', e);
                 }
-                return target;
             },
             publishPlaybackState(item, currentTimeSeconds) {
                 if (!item) return;
@@ -681,6 +706,7 @@
                     DASHBOARD_ALERT_PLAYBACK_PUBLISH_MS
                 );
             },
+            /** When another client is already playing this clip, start it here from the beginning (no seek into the file). */
             maybeJoinFromPlaybackState(state) {
                 const normalized = this.normalizePlaybackState(state);
                 if (!normalized || !this.isPlaybackStateFresh(normalized)) {
@@ -694,7 +720,8 @@
                 if (!this.samePlaybackActivation(normalized, item)) return false;
                 if (this.playingKey != null) return false;
                 if (this._queuedKeys[item.key]) return false;
-                this.playAlertItem(item, { syncState: normalized });
+                // Playlist-level only: start this clip from the beginning (no mid-file seek).
+                this.playAlertItem(item);
                 return true;
             },
             onSharedPlaybackSignal(rawState) {
@@ -813,11 +840,9 @@
                 }
                 this._replayCountByKey = {};
             },
-            playAlertItem(item, options) {
+            playAlertItem(item) {
                 if (!item) return;
                 if (this.playingKey != null) return;
-                const syncState =
-                    options && options.syncState ? this.normalizePlaybackState(options.syncState) : null;
 
                 const a = this.ensureAudioElement();
                 a.loop = false;
@@ -899,42 +924,6 @@
                     );
                 };
 
-                if (syncState && this.samePlaybackActivation(syncState, item)) {
-                    const startJoinedPlayback = () => {
-                        if (guard.cancelled) return;
-                        let joinSeconds = this.computeJoinSeekSeconds(syncState);
-                        if (!Number.isFinite(joinSeconds) || joinSeconds < 0) {
-                            joinSeconds = 0;
-                        }
-                        if (Number.isFinite(a.duration) && a.duration > 0) {
-                            if (joinSeconds >= a.duration) {
-                                guard.cancelled = true;
-                                a.removeEventListener('ended', onEndedOnce);
-                                clearWatchdog();
-                                if (this.playingKey === item.key) this.playingKey = null;
-                                return;
-                            }
-                            joinSeconds = Math.min(joinSeconds, Math.max(0, a.duration - 0.05));
-                        }
-                        try {
-                            a.currentTime = joinSeconds;
-                        } catch (e) {
-                            /* ignore */
-                        }
-                        beginPlayback(joinSeconds);
-                    };
-                    if (a.readyState >= 1) {
-                        startJoinedPlayback();
-                    } else {
-                        const onMeta = () => {
-                            a.removeEventListener('loadedmetadata', onMeta);
-                            startJoinedPlayback();
-                        };
-                        a.addEventListener('loadedmetadata', onMeta);
-                    }
-                    return;
-                }
-
                 beginPlayback(0);
             },
             tryPlayNextFromQueue() {
@@ -988,6 +977,9 @@
                 return null;
             },
             onAlertAudioEnded() {
+                const endedKey = this.playingKey;
+                const endedItem = endedKey != null ? this.getActiveAudioItemByKey(endedKey) : null;
+                void this.notifyServerClipEnded(endedItem);
                 // If we left the element "playing" (e.g. watchdog fired before a real `ended` in WebView),
                 // pause so the next replay does not hit playAlertItem's same-src early-return with playingKey stuck.
                 const a = this._audioEl;
@@ -1002,7 +994,6 @@
                 this._lastServerPlaybackPublishAt = 0;
                 this._serverPlaybackState = null;
                 void this.clearPlaybackStateOnServer();
-                const endedKey = this.playingKey;
                 console.log('Audio ended, playingKey:', endedKey);
                 this.playingKey = null;
                 this.playlistIdx = 0;
@@ -1097,6 +1088,7 @@
                     const wasActive = this.sameActivationPersisted(prevPersisted[item.key], item);
                     if (wasActive) continue;
                     if (sharedPlayback && this.samePlaybackActivation(sharedPlayback, item)) continue;
+                    if (this.shouldSkipInitialPlayDueToServerEndedCooldown(item, sharedPlayback)) continue;
 
                     // If a timer exists (e.g., due to timing races), clear it; new timer starts after this playback ends.
                     if (this._replayTimerByKey[item.key] != null) {
@@ -1170,6 +1162,10 @@
                         this._serverTimeSkewMs = j.serverTimeMs - Date.now();
                     }
                     this._serverPlaybackState = this.normalizePlaybackState(j.playbackSync);
+                    this._serverPlaybackLastEnded =
+                        j.alertPlaybackLastEnded && typeof j.alertPlaybackLastEnded === 'object'
+                            ? j.alertPlaybackLastEnded
+                            : {};
 
                     this.syncAlertAudioPlaylist(next);
                     

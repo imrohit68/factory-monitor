@@ -59,6 +59,7 @@ public class SecurityConfig {
                         "/admin/workstations/audio-preview/**",
                         "/api/dashboard/playback-sync",
                         "/api/dashboard/playback-sync/clear",
+                        "/api/dashboard/playback-sync/ended",
                         "/api/dashboard/simulation/toggle/**"));
         return http.build();
     }

@@ -1,6 +1,7 @@
 package com.example.system.web;
 
 import com.example.system.config.ApplicationOperationMode;
+import com.example.system.dto.DashboardPlaybackEndedDto;
 import com.example.system.dto.DashboardPlaybackSyncClearDto;
 import com.example.system.dto.DashboardPlaybackSyncDto;
 import com.example.system.service.OrchestrationService;
@@ -45,6 +46,12 @@ public class DashboardApiController {
     @PostMapping("/playback-sync/clear")
     public ResponseEntity<Void> clearPlaybackSync(@RequestBody DashboardPlaybackSyncClearDto body) {
         dashboardPlaybackSyncService.clear(body);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/playback-sync/ended")
+    public ResponseEntity<Void> recordPlaybackEnded(@RequestBody DashboardPlaybackEndedDto body) {
+        dashboardPlaybackSyncService.recordClipEnded(body);
         return ResponseEntity.noContent().build();
     }
 
