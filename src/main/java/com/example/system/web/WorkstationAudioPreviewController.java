@@ -35,9 +35,10 @@ public class WorkstationAudioPreviewController {
             String url = "/admin/workstations/audio-preview/" + id + ".mp3";
             return ResponseEntity.ok(Map.of("url", url));
         } catch (IOException e) {
+            String msg = e.getMessage() != null ? e.getMessage() : "Could not create preview.";
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .contentType(MediaType.TEXT_PLAIN)
-                    .body(e.getMessage() != null ? e.getMessage() : "Could not create preview.");
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("error", msg));
         }
     }
 

@@ -135,7 +135,9 @@ public class FactoryMonitorDesktopApplication extends Application {
                                         () -> showError("Timed out waiting for the server on port " + httpPort));
                                 return;
                             }
-                            String url = "http://127.0.0.1:" + httpPort + "/";
+                            // wv=1: skip browser-only dashboard gate when desktop-mode JVM is opened in this WebView
+                            // (external browsers still see the gate at /).
+                            String url = "http://127.0.0.1:" + httpPort + "/?wv=1";
                             Platform.runLater(() -> webView.getEngine().load(url));
                         },
                         "fx-http-wait");

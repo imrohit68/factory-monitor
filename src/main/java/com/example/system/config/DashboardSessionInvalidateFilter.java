@@ -11,9 +11,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Ends the HTTP session whenever the dashboard ({@code GET /}) is opened. Operators use Login when
- * entering admin; leaving admin via “Return to Dashboard” should not keep an authenticated session
- * on the floor display.
+ * Ends the HTTP session whenever the floor display is opened ({@code GET /} gate or {@code GET
+ * /dashboard} matrix). Operators use Login when entering admin; leaving admin via “Return to
+ * Dashboard” should not keep an authenticated session on the floor display. After the first visit to
+ * {@code /dashboard}, {@link com.example.system.web.DashboardController} sets a long-lived cookie so
+ * {@code GET /} can skip the audio gate on later returns without restoring admin auth.
  */
 @Component
 public class DashboardSessionInvalidateFilter extends OncePerRequestFilter {
@@ -22,7 +24,7 @@ public class DashboardSessionInvalidateFilter extends OncePerRequestFilter {
     protected void doFilterInternal(
             HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
-        if (isDashboardRootGet(request)) {
+        if (isFloorDisplayGet(request)) {
             HttpSession session = request.getSession(false);
             if (session != null) {
                 session.invalidate();
@@ -32,7 +34,7 @@ public class DashboardSessionInvalidateFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    private static boolean isDashboardRootGet(HttpServletRequest request) {
+    private static boolean isFloorDisplayGet(HttpServletRequest request) {
         if (!"GET".equalsIgnoreCase(request.getMethod())) {
             return false;
         }
@@ -48,6 +50,8 @@ public class DashboardSessionInvalidateFilter extends OncePerRequestFilter {
         if (semi >= 0) {
             uri = uri.substring(0, semi);
         }
-        return uri.equals(ctx + "/") || uri.equals(ctx);
+        return uri.equals(ctx + "/")
+                || uri.equals(ctx)
+                || uri.equals(ctx + "/dashboard");
     }
 }

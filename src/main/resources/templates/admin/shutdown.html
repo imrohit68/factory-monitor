@@ -30,6 +30,7 @@
 
             <form th:action="@{/admin/shutdown}" method="post"
                   class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden p-6 space-y-4">
+                <input type="hidden" th:if="${shutdownFormCsrf != null}" th:name="${shutdownFormCsrf.parameterName}" th:value="${shutdownFormCsrf.token}"/>
                 <button type="submit"
                         class="uc-motion inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-red-700 text-white rounded-lg hover:bg-red-800 text-sm font-medium">
                     <iconify-icon icon="solar:power-linear" class="text-lg"></iconify-icon>

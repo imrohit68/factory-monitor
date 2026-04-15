@@ -77,11 +77,9 @@
                 _pendingEndedAckSequence: null,
                 _currentServerClip: null,
                 _mainPollInterval: null,
-                _hintPollInterval: null,
                 _visibilityHandler: null,
                 _beforeUnloadHandler: null,
                 _gestureResumeAudio: null,
-                showAudioGestureHint: false,
                 _refreshInFlight: false,
                 mode: 'PRODUCTION',
                 speakerFrameIndex: 0,
@@ -101,17 +99,6 @@
                     return;
                 }
                 this.stopSpeakerAnimation();
-            },
-            showAudioGestureHint(on) {
-                if (on) {
-                    if (this._hintPollInterval != null) return;
-                    this._hintPollInterval = setInterval(() => this.refresh(), 750);
-                    return;
-                }
-                if (this._hintPollInterval != null) {
-                    clearInterval(this._hintPollInterval);
-                    this._hintPollInterval = null;
-                }
             }
         },
         mounted() {
@@ -147,10 +134,6 @@
             if (this._mainPollInterval != null) {
                 clearInterval(this._mainPollInterval);
                 this._mainPollInterval = null;
-            }
-            if (this._hintPollInterval != null) {
-                clearInterval(this._hintPollInterval);
-                this._hintPollInterval = null;
             }
             if (this._visibilityHandler) {
                 document.removeEventListener('visibilitychange', this._visibilityHandler);
@@ -336,18 +319,9 @@
                 }
                 playPromise
                     .then(() => {
-                        this.showAudioGestureHint = false;
                         if (typeof onSuccess === 'function') onSuccess();
                     })
                     .catch((err) => {
-                        const name = err && err.name;
-                        const msg = (err && err.message) || '';
-                        if (
-                            name === 'NotAllowedError' ||
-                            /not allowed|user gesture|interaction/i.test(msg)
-                        ) {
-                            this.showAudioGestureHint = true;
-                        }
                         if (typeof onFailure === 'function') onFailure(err);
                     });
             },
@@ -401,7 +375,6 @@
                 this._pendingEndedAckSequence = null;
             },
             stopAlertAudio() {
-                this.showAudioGestureHint = false;
                 this.abortLocalPlaybackWithoutNotify();
             },
             applyServerAlertAudio(cmd) {

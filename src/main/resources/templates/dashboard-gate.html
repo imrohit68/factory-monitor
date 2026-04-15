@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en" class="antialiased" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0"/>
+    <meta http-equiv="Pragma" content="no-cache"/>
+    <title>Production Calling System — Welcome</title>
+    <script th:src="@{/vendor/tailwindcss-standalone.js}"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" th:href="@{/css/app.css}"/>
+    <style>
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            letter-spacing: -0.01em;
+        }
+        .gate-shell {
+            background:
+                radial-gradient(ellipse 90% 70% at 50% -15%, rgba(59, 130, 246, 0.09), transparent 55%),
+                radial-gradient(ellipse 65% 55% at 100% 100%, rgba(14, 165, 233, 0.07), transparent 50%),
+                linear-gradient(165deg, #eef2f8 0%, #e4ebf4 45%, #e8eef6 100%);
+        }
+        .gate-hit-layer {
+            background: linear-gradient(145deg, rgba(30, 41, 59, 0.14) 0%, rgba(51, 65, 85, 0.1) 100%);
+        }
+        @supports (backdrop-filter: blur(14px)) or (-webkit-backdrop-filter: blur(14px)) {
+            .gate-hit-blur {
+                backdrop-filter: blur(16px);
+                -webkit-backdrop-filter: blur(16px);
+            }
+        }
+        .gate-card {
+            box-shadow:
+                0 1px 2px rgba(15, 23, 42, 0.04),
+                0 24px 48px -12px rgba(15, 23, 42, 0.1);
+        }
+    </style>
+</head>
+<body class="gate-shell min-h-screen m-0 p-0 text-slate-800 relative overflow-hidden">
+
+<!-- Full-viewport hit target: satisfies browser autoplay gesture before /dashboard -->
+<a th:href="@{/dashboard(cb=${#dates.createNow().getTime()})}"
+   tabindex="0"
+   class="gate-hit-layer gate-hit-blur fixed inset-0 z-0 block cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40 focus-visible:ring-inset transition-opacity hover:opacity-[0.97]"
+   aria-label="Continue to production dashboard — click or tap anywhere"></a>
+
+<div class="relative z-10 pointer-events-none flex min-h-screen flex-col items-center justify-center px-5 py-10 sm:px-8 sm:py-14">
+    <div class="gate-card max-w-[26rem] w-full rounded-[1.75rem] border border-white/70 bg-white/[0.92] px-8 py-10 sm:px-11 sm:py-12 text-center ring-1 ring-slate-900/[0.04]">
+        <div class="mx-auto mb-7 flex h-[5.25rem] w-[5.25rem] items-center justify-center rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100/90 ring-1 ring-slate-200/80 shadow-inner">
+            <img th:src="@{/images/app-logo.svg}" alt="" class="h-16 w-16 shrink-0" aria-hidden="true"/>
+        </div>
+        <h1 class="text-[1.35rem] sm:text-2xl font-semibold tracking-tight text-slate-900 leading-snug">
+            Before we open the dashboard
+        </h1>
+        <p class="mt-4 text-[0.9375rem] sm:text-base text-slate-600 leading-relaxed max-w-[22rem] mx-auto">
+            Your browser only allows <span class="font-semibold text-slate-800">alert sounds</span> after it sees a
+            <span class="font-semibold text-slate-800">click or tap</span> from you.
+        </p>
+        <div class="mt-8 inline-flex flex-col items-center gap-2 rounded-2xl bg-slate-50/90 px-5 py-4 ring-1 ring-slate-200/80 max-w-full">
+            <p class="text-[0.9375rem] sm:text-base font-medium text-slate-800 leading-snug">
+                Click or tap <span class="text-slate-950">anywhere on this screen</span>
+            </p>
+            <p class="text-sm text-slate-500 font-normal">to open the production floor dashboard</p>
+        </div>
+        <p class="mt-7 text-xs text-slate-500 leading-relaxed max-w-[20rem] mx-auto">
+            You only need to do this once per browser on this device. After that, returning from admin goes straight to the dashboard.
+        </p>
+        <p class="mt-8 text-[11px] sm:text-xs text-slate-400 tracking-wide">Unicharm India Pvt. Ltd.</p>
+    </div>
+</div>
+</body>
+</html>

@@ -111,6 +111,7 @@
                                     <input type="file" name="engAudioFile" id="ws-file-eng"
                                            accept=".mp3,.wav,.ogg"
                                            class="block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-medium"/>
+                                    <p id="ws-audio-err-eng" class="hidden mt-1 text-sm text-red-600" role="alert"></p>
                                 </div>
                             </div>
                         </div>
@@ -174,6 +175,7 @@
                                     <input type="file" name="leadAudioFile" id="ws-file-lead"
                                            accept=".mp3,.wav,.ogg"
                                            class="block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-medium"/>
+                                    <p id="ws-audio-err-lead" class="hidden mt-1 text-sm text-red-600" role="alert"></p>
                                 </div>
                             </div>
                         </div>
@@ -237,6 +239,7 @@
                                     <input type="file" name="qcAudioFile" id="ws-file-qc"
                                            accept=".mp3,.wav,.ogg"
                                            class="block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-medium"/>
+                                    <p id="ws-audio-err-qc" class="hidden mt-1 text-sm text-red-600" role="alert"></p>
                                 </div>
                             </div>
                         </div>
@@ -262,9 +265,34 @@
         var objectUrls = { eng: null, lead: null, qc: null };
         var previewControllers = { eng: null, lead: null, qc: null };
         var serverPreviewIds = { eng: null, lead: null, qc: null };
-        var AUDIO_EXT = /\.(mp3|wav|ogg)$/i;
         var MP3_EXT = /\.mp3$/i;
         var PREVIEW_URL_ID = /\/admin\/workstations\/audio-preview\/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})\.mp3/i;
+        var UNSUPPORTED_TYPE_MSG = 'This file type is not supported. Use MP3, WAV, or OGG only.';
+
+        function clearAudioFieldMessage(slot) {
+            var el = document.getElementById('ws-audio-err-' + slot);
+            if (!el) return;
+            el.textContent = '';
+            el.classList.add('hidden');
+        }
+
+        function showAudioFieldMessage(slot, message) {
+            var el = document.getElementById('ws-audio-err-' + slot);
+            if (!el || !message) return;
+            el.textContent = message;
+            el.classList.remove('hidden');
+            try {
+                el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            } catch (e) { /* ignore */ }
+        }
+
+        function playSlotFromPreviewButton(btn) {
+            if (!btn || !btn.id) return null;
+            if (btn.id === 'ws-play-eng') return 'eng';
+            if (btn.id === 'ws-play-lead') return 'lead';
+            if (btn.id === 'ws-play-qc') return 'qc';
+            return null;
+        }
 
         function deleteServerPreview(id, keepalive) {
             if (!id) return;
@@ -295,10 +323,21 @@
             }
         }
 
+        /**
+         * Mirrors server rules: if the filename has an extension, only mp3 / wav / ogg are accepted (not e.g. .oga).
+         * If there is no extension, allowed audio/* MIME types may qualify (same as {@code AudioStorageService}).
+         */
         function isChosenFileAudio(file) {
             if (!file) return true;
             var name = file.name || '';
-            if (AUDIO_EXT.test(name)) return true;
+            var dot = name.lastIndexOf('.');
+            var ext = dot >= 0 && dot < name.length - 1 ? name.substring(dot + 1).toLowerCase() : '';
+            if (ext.length > 8) {
+                ext = '';
+            }
+            if (ext) {
+                return ext === 'mp3' || ext === 'wav' || ext === 'ogg';
+            }
             var t = (file.type || '').toLowerCase().split(';')[0].trim();
             return t === 'audio/mpeg' || t === 'audio/mp3' || t === 'audio/wav' || t === 'audio/wave'
                 || t === 'audio/x-wav' || t === 'audio/ogg' || t === 'application/ogg';
@@ -325,11 +364,13 @@
             }
             var a = new Audio(src);
             window._wsAudioPreview = a;
+            var slot = playSlotFromPreviewButton(btn);
             a.play().catch(function (err) {
+                if (!slot) return;
                 if (err && err.name === 'NotAllowedError') {
-                    window.alert('Tap Play again — the browser required a click or tap on this page first.');
+                    showAudioFieldMessage(slot, 'Tap Play again — the browser required a click or tap on this page first.');
                 } else {
-                    window.alert('Playback failed. Use MP3, WAV, or OGG on the workstation form.');
+                    showAudioFieldMessage(slot, 'This file does not play as supported audio. Use a valid MP3, WAV, or OGG file.');
                 }
             });
         };
@@ -346,12 +387,25 @@
                 credentials: 'same-origin',
                 signal: ac.signal
             }).then(function (r) {
-                if (!r.ok) {
-                    return r.text().then(function (t) {
-                        throw new Error(t && t.trim() ? t.trim() : ('HTTP ' + r.status));
-                    });
-                }
-                return r.json();
+                return r.text().then(function (t) {
+                    var j = null;
+                    if (t && t.trim()) {
+                        try {
+                            j = JSON.parse(t);
+                        } catch (parseErr) { /* plain text body */ }
+                    }
+                    if (!r.ok) {
+                        var msg = (j && typeof j.error === 'string' && j.error) ? j.error
+                            : (j && typeof j.message === 'string' && j.message) ? j.message
+                            : (t && t.trim()) ? t.trim()
+                            : ('HTTP ' + r.status);
+                        throw new Error(msg);
+                    }
+                    if (!j || typeof j.url !== 'string') {
+                        throw new Error('Unexpected response from server.');
+                    }
+                    return j;
+                });
             }).then(function (j) {
                 if (previewControllers[slot] !== ac) return;
                 var u = j && j.url;
@@ -367,10 +421,10 @@
             }).catch(function (err) {
                 if (err.name === 'AbortError') return;
                 if (previewControllers[slot] !== ac) return;
-                window.alert(err.message || 'Could not prepare preview (install FFmpeg or use MP3).');
+                showAudioFieldMessage(slot, err.message || 'Could not prepare preview (install FFmpeg or use MP3).');
                 fileInput.value = '';
                 previewControllers[slot] = null;
-                syncSlot(slot, fileInput, playBtn, clearCheckbox);
+                syncSlot(slot, fileInput, playBtn, clearCheckbox, true);
             }).finally(function () {
                 if (previewControllers[slot] === ac) {
                     previewControllers[slot] = null;
@@ -378,8 +432,11 @@
             });
         }
 
-        function syncSlot(slot, fileInput, playBtn, clearCheckbox) {
+        function syncSlot(slot, fileInput, playBtn, clearCheckbox, retainFieldMessage) {
             revokeSlot(slot);
+            if (!retainFieldMessage) {
+                clearAudioFieldMessage(slot);
+            }
             var saved = (playBtn.getAttribute('data-saved-audio-src') || '').trim();
             var file = fileInput.files && fileInput.files[0];
             var clearOn = clearCheckbox && clearCheckbox.checked;
@@ -387,7 +444,7 @@
             if (file) {
                 if (!isChosenFileAudio(file)) {
                     fileInput.value = '';
-                    window.alert('Please choose an MP3, WAV, or OGG file only.');
+                    showAudioFieldMessage(slot, UNSUPPORTED_TYPE_MSG);
                     file = null;
                 }
             }
