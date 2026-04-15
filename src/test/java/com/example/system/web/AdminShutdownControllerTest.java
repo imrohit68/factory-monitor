@@ -12,7 +12,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.system.config.ApplicationShutdownService;
-import jakarta.servlet.http.Cookie;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
@@ -100,13 +99,11 @@ class AdminShutdownControllerTest {
                 .andExpect(content().string(containsString("name=\"_csrf\"")));
     }
 
-    /** {@code GET /} serves the gate by default, but skips to the matrix when the floor audio gesture cookie is set. */
+    /** {@code GET /} serves the gate HTML; client-side sessionStorage may redirect to the matrix in the same tab. */
     @Test
-    void getRoot_withFloorAudioGestureCookie_servesDashboardNotGate() throws Exception {
-        mockMvc.perform(
-                        get("/")
-                                .cookie(new Cookie(DashboardController.FLOOR_AUDIO_GESTURE_COOKIE, "1")))
+    void getRoot_servesGatePage() throws Exception {
+        mockMvc.perform(get("/"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("Production Calling System — Dashboard")));
+                .andExpect(content().string(containsString("Production Calling System — Welcome")));
     }
 }

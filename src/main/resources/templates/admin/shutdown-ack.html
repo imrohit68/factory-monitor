@@ -11,7 +11,12 @@
     <div class="max-w-md text-center space-y-3">
         <iconify-icon icon="solar:check-circle-linear" class="text-5xl text-emerald-600 mx-auto block"></iconify-icon>
         <h1 class="text-xl font-medium text-gray-900">Shutdown requested</h1>
-        <p class="text-sm text-gray-600">The application is stopping. You can close this tab.</p>
+        <p class="text-sm text-gray-600" th:if="${shutdownAutoCloseWindow}">
+            The application is stopping. This window will close on its own in a few seconds.
+        </p>
+        <p class="text-sm text-gray-600" th:unless="${shutdownAutoCloseWindow}">
+            The application is stopping. You can close this tab.
+        </p>
     </div>
 </div>
 </body>

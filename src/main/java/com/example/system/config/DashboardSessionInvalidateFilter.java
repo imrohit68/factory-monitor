@@ -13,9 +13,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
 /**
  * Ends the HTTP session whenever the floor display is opened ({@code GET /} gate or {@code GET
  * /dashboard} matrix). Operators use Login when entering admin; leaving admin via “Return to
- * Dashboard” should not keep an authenticated session on the floor display. After the first visit to
- * {@code /dashboard}, {@link com.example.system.web.DashboardController} sets a long-lived cookie so
- * {@code GET /} can skip the audio gate on later returns without restoring admin auth.
+ * Dashboard” should not keep an authenticated session on the floor display. Skipping the audio gate on
+ * {@code GET /} in the same browser tab uses {@code sessionStorage} in {@code dashboard-gate.html}, not the HTTP
+ * session.
  */
 @Component
 public class DashboardSessionInvalidateFilter extends OncePerRequestFilter {

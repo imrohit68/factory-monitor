@@ -2,6 +2,20 @@
 <html lang="en" class="antialiased" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8"/>
+    <script th:inline="javascript">
+        /*<![CDATA[*/
+        /* Key must match DashboardController.FLOOR_AUDIO_GESTURE_SESSION_STORAGE_KEY */
+        (function () {
+            var dashUrl = /*[[@{/dashboard(cb=${#dates.createNow().getTime()})}]]*/ '';
+            if (!dashUrl) return;
+            try {
+                if (sessionStorage.getItem('pcs_floor_audio_gesture') === '1') {
+                    window.location.replace(dashUrl);
+                }
+            } catch (e) { /* storage blocked — stay on gate */ }
+        })();
+        /*]]>*/
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0"/>
     <meta http-equiv="Pragma" content="no-cache"/>
@@ -65,7 +79,7 @@
             <p class="text-sm text-slate-500 font-normal">to open the production floor dashboard</p>
         </div>
         <p class="mt-7 text-xs text-slate-500 leading-relaxed max-w-[20rem] mx-auto">
-            You only need to do this once per browser on this device. After that, returning from admin goes straight to the dashboard.
+            You only need to do this once per tab when you first open the floor. In this same tab, returning from admin skips this screen. A new tab asks again so alert sounds keep working.
         </p>
         <p class="mt-8 text-[11px] sm:text-xs text-slate-400 tracking-wide">Unicharm India Pvt. Ltd.</p>
     </div>

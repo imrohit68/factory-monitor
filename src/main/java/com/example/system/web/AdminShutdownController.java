@@ -1,8 +1,11 @@
 package com.example.system.web;
 
 import com.example.system.config.ApplicationShutdownService;
+import com.example.system.config.SingleInstanceSupport;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+
+import java.util.Locale;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -36,8 +39,17 @@ public class AdminShutdownController {
     }
 
     @PostMapping
-    public String shutdown() {
+    public String shutdown(HttpServletRequest request, Model model) {
         applicationShutdownService.shutdownGracefully();
+        boolean autoCloseWindow =
+                SingleInstanceSupport.isDesktopMode() && isLikelyJavaFxWebView(request);
+        model.addAttribute("shutdownAutoCloseWindow", autoCloseWindow);
         return "admin/shutdown-ack";
+    }
+
+    /** Admin in the embedded JavaFX shell uses a WebView whose user agent contains {@code JavaFX}. */
+    private static boolean isLikelyJavaFxWebView(HttpServletRequest request) {
+        String ua = request.getHeader("User-Agent");
+        return ua != null && ua.toLowerCase(Locale.ROOT).contains("javafx");
     }
 }

@@ -4,44 +4,37 @@ import com.example.system.config.AppProperties;
 import com.example.system.config.SingleInstanceSupport;
 import com.example.system.service.OrchestrationService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-import java.time.Duration;
 import java.util.Locale;
 
 @Controller
 @RequiredArgsConstructor
 public class DashboardController {
 
-    /** Set after the operator reaches {@code /dashboard} once; survives {@link com.example.system.config.DashboardSessionInvalidateFilter} (session cleared on floor views). */
-    public static final String FLOOR_AUDIO_GESTURE_COOKIE = "PCS_FLOOR_AUDIO_OK";
-
-    private static final String FLOOR_AUDIO_GESTURE_VALUE = "1";
-    private static final Duration FLOOR_AUDIO_GESTURE_MAX_AGE = Duration.ofDays(30);
+    /**
+     * Browser {@code sessionStorage} key set from {@code dashboard.html} after the matrix loads. The gate page
+     * redirects to {@code /dashboard} when present so “Return to dashboard” in the same tab skips the gate, while
+     * a new tab has no key and shows the gate again (autoplay policy).
+     */
+    public static final String FLOOR_AUDIO_GESTURE_SESSION_STORAGE_KEY = "pcs_floor_audio_gesture";
 
     private final OrchestrationService orchestration;
     private final AppProperties appProperties;
 
     /**
-     * Gate at {@code /} for real browsers until they have opened the matrix once (cookie). Avoids showing the gate on
-     * every “Return to Dashboard” from admin. JavaFX WebView skips via {@code ?wv=1} or JavaFX User-Agent.
+     * Browser: gate at {@code /} (with client-side skip via sessionStorage when this tab already opened the matrix).
+     * JavaFX WebView skips via {@code ?wv=1} or JavaFX User-Agent.
      */
     @GetMapping("/")
     public String root(HttpServletRequest request, HttpServletResponse response, Model model) {
         applyNoStoreHeaders(response);
         if (SingleInstanceSupport.isDesktopMode() && isDesktopEmbeddedWebClient(request)) {
-            applyDashboardModel(model);
-            return "dashboard";
-        }
-        if (hasFloorAudioGestureCookie(request)) {
             applyDashboardModel(model);
             return "dashboard";
         }
@@ -65,37 +58,10 @@ public class DashboardController {
      * shell.
      */
     @GetMapping("/dashboard")
-    public String dashboard(HttpServletRequest request, HttpServletResponse response, Model model) {
+    public String dashboard(HttpServletResponse response, Model model) {
         applyNoStoreHeaders(response);
-        addFloorAudioGestureCookie(response, request.isSecure());
         applyDashboardModel(model);
         return "dashboard";
-    }
-
-    static boolean hasFloorAudioGestureCookie(HttpServletRequest request) {
-        Cookie[] cookies = request.getCookies();
-        if (cookies == null) {
-            return false;
-        }
-        for (Cookie c : cookies) {
-            if (FLOOR_AUDIO_GESTURE_COOKIE.equals(c.getName())
-                    && FLOOR_AUDIO_GESTURE_VALUE.equals(c.getValue())) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static void addFloorAudioGestureCookie(HttpServletResponse response, boolean requestSecure) {
-        ResponseCookie cookie =
-                ResponseCookie.from(FLOOR_AUDIO_GESTURE_COOKIE, FLOOR_AUDIO_GESTURE_VALUE)
-                        .path("/")
-                        .maxAge(FLOOR_AUDIO_GESTURE_MAX_AGE)
-                        .httpOnly(true)
-                        .sameSite("Lax")
-                        .secure(requestSecure)
-                        .build();
-        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 
     private void applyDashboardModel(Model model) {
