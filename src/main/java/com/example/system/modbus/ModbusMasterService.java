@@ -41,7 +41,14 @@ public class ModbusMasterService {
     private volatile boolean connected;
     private volatile String lastError;
 
-    /** Only updated while holding {@link #lock} during {@link #readInputBits} or cleared in {@link #disconnectUnlocked}. */
+    /**
+     * When false, {@link #ensureConnected()} will not open a new serial session until {@link #reconnect(String)} runs
+     * (e.g. user saves port in Configure device). Prevents reconnect storms after repeated FC04 failures or
+     * {@link #disconnectWithMessage(String)}.
+     */
+    private volatile boolean autoConnectEnabled = true;
+
+    /** Only updated while holding {@link #lock} during read paths or cleared in {@link #disconnectUnlocked}. */
     private int consecutiveReadFailures;
 
     public ModbusMasterService(ModbusProperties props) {
@@ -59,6 +66,12 @@ public class ModbusMasterService {
     public void ensureConnected() {
         lock.lock();
         try {
+            if (!autoConnectEnabled) {
+                if (connected || master != null) {
+                    disconnectUnlocked();
+                }
+                return;
+            }
             if (connected && master != null) {
                 return;
             }
@@ -70,12 +83,13 @@ public class ModbusMasterService {
             params.setParity(props.getParity());
             params.setStopbits(props.getStopBits());
             params.setEncoding(props.getEncoding());
-            master = new ModbusSerialMaster(params);
+            int responseTimeoutMs = Math.max(50, props.getResponseTimeoutMs());
+            master = new ModbusSerialMaster(params, responseTimeoutMs);
             master.connect();
             connected = true;
             lastError = null;
             consecutiveReadFailures = 0;
-            log.info("Modbus serial connected on {}", props.getPortName());
+            log.info("Modbus serial connected on {} (response timeout {} ms)", props.getPortName(), responseTimeoutMs);
         } catch (Exception e) {
             lastError = toUserFacingMessage(e, UserErrorContext.OPEN_PORT);
             log.warn("Modbus connect failed: {}", e.getMessage(), e);
@@ -89,12 +103,19 @@ public class ModbusMasterService {
      * Reads input registers from {@link ModbusProperties#getInputSlaveId()} only.
      */
     public boolean[] readInputBits(int bitCount) {
+        return readInputBitsWithOutcome(bitCount).bits();
+    }
+
+    /**
+     * FC04 read with explicit attempt/response flags for dashboard TX/RX.
+     */
+    public ModbusInputReadResult readInputBitsWithOutcome(int bitCount) {
         ensureConnected();
         if (!connected || master == null) {
             if (props.isLogEachRead()) {
                 log.debug("Modbus read skipped (not connected); {} bits unavailable", bitCount);
             }
-            return new boolean[bitCount];
+            return new ModbusInputReadResult(new boolean[bitCount], false, false);
         }
         lock.lock();
         try {
@@ -108,7 +129,7 @@ public class ModbusMasterService {
             if (props.isLogEachRead()) {
                 logSuccessfulRead(inputSlave, regStart, regCount, registers, bits);
             }
-            return bits;
+            return new ModbusInputReadResult(bits, true, true);
         } catch (Exception e) {
             consecutiveReadFailures++;
             if (consecutiveReadFailures < READ_FAILURES_BEFORE_DISCONNECT) {
@@ -119,7 +140,7 @@ public class ModbusMasterService {
                         READ_FAILURES_BEFORE_DISCONNECT,
                         e.getMessage(),
                         e);
-                return new boolean[bitCount];
+                return new ModbusInputReadResult(new boolean[bitCount], true, false);
             }
             lastError = toUserFacingMessage(e, UserErrorContext.READ_INPUTS);
             log.warn(
@@ -128,17 +149,12 @@ public class ModbusMasterService {
                     consecutiveReadFailures,
                     e.getMessage(),
                     e);
-            connected = false;
-            try {
-                if (master != null) {
-                    master.disconnect();
-                }
-            } catch (Exception ignored) {
-                // ignore
-            }
-            master = null;
-            consecutiveReadFailures = 0;
-            return new boolean[bitCount];
+            disconnectUnlocked();
+            autoConnectEnabled = false;
+            log.info(
+                    "Modbus auto-reconnect disabled after repeated read failures; use Configure device and save to"
+                            + " reconnect.");
+            return new ModbusInputReadResult(new boolean[bitCount], true, false);
         } finally {
             lock.unlock();
         }
@@ -183,14 +199,16 @@ public class ModbusMasterService {
      * {@link ModbusProperties#getRelayChannelsPerSlave()}; coil index = relayNumber − 1, so coil address =
      * {@code coilStartAddress + (relayNumber - 1)}.
      */
-    public void writeRelayOutput(int outputSlaveId, int relayNumber, boolean energized) {
-        writeRelayOutput(outputSlaveId, relayNumber, energized, false);
+    public ModbusRelayWriteResult writeRelayOutput(int outputSlaveId, int relayNumber, boolean energized) {
+        return writeRelayOutput(outputSlaveId, relayNumber, energized, false);
     }
 
     /**
      * @param quietSuccessLog when true, log successful writes at DEBUG (for per-poll input/output sync).
+     * @return whether FC05 was sent and whether it completed without error
      */
-    public void writeRelayOutput(int outputSlaveId, int relayNumber, boolean energized, boolean quietSuccessLog) {
+    public ModbusRelayWriteResult writeRelayOutput(
+            int outputSlaveId, int relayNumber, boolean energized, boolean quietSuccessLog) {
         int channels = props.getRelayChannelsPerSlave();
         if (relayNumber < 1 || relayNumber > channels) {
             log.warn(
@@ -199,7 +217,7 @@ public class ModbusMasterService {
                     relayNumber,
                     channels,
                     energized);
-            return;
+            return new ModbusRelayWriteResult(false, false);
         }
         int coilIndex = relayNumber - 1;
         ensureConnected();
@@ -209,7 +227,7 @@ public class ModbusMasterService {
                     outputSlaveId,
                     relayNumber,
                     energized);
-            return;
+            return new ModbusRelayWriteResult(false, false);
         }
         lock.lock();
         try {
@@ -234,6 +252,7 @@ public class ModbusMasterService {
                         props.getCoilStartAddress(),
                         energized);
             }
+            return new ModbusRelayWriteResult(true, true);
         } catch (Exception e) {
             lastError = toUserFacingMessage(e, UserErrorContext.WRITE_OUTPUTS);
             log.warn(
@@ -242,6 +261,7 @@ public class ModbusMasterService {
                     relayNumber,
                     e.getMessage(),
                     e);
+            return new ModbusRelayWriteResult(true, false);
         } finally {
             lock.unlock();
         }
@@ -253,6 +273,7 @@ public class ModbusMasterService {
     public void reconnect(String newPortName) {
         lock.lock();
         try {
+            autoConnectEnabled = true;
             props.setPortName(newPortName);
             disconnectUnlocked();
             lastError = null;
@@ -267,6 +288,24 @@ public class ModbusMasterService {
         lock.lock();
         try {
             disconnectUnlocked();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * Closes the Modbus serial session and stores a dashboard-facing message (e.g. repeated output failures).
+     */
+    public void disconnectWithMessage(String userMessage) {
+        lock.lock();
+        try {
+            disconnectUnlocked();
+            autoConnectEnabled = false;
+            if (userMessage != null && !userMessage.isBlank()) {
+                lastError = userMessage.trim();
+            }
+            log.info(
+                    "Modbus auto-reconnect disabled after disconnect; use Configure device and save to reconnect.");
         } finally {
             lock.unlock();
         }

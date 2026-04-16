@@ -229,3 +229,51 @@ col.matrix-col-label {
     padding-bottom: 0.5rem;
     padding-inline: 0.125rem;
 }
+
+/* Dashboard header — Modbus poll TX/RX lamps */
+.modbus-traffic__bulb {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 9999px;
+    background: #d1d5db;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+    transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+@media (min-width: 640px) {
+    .modbus-traffic__bulb {
+        width: 0.5625rem;
+        height: 0.5625rem;
+    }
+}
+@keyframes modbusTrafficFlashGreen {
+    0%,
+    100% {
+        background: #d1d5db;
+        box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+        transform: scale(1);
+    }
+    40% {
+        background: #22c55e;
+        box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.45);
+        transform: scale(1.25);
+    }
+}
+@keyframes modbusTrafficFlashRed {
+    0%,
+    100% {
+        background: #d1d5db;
+        box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+        transform: scale(1);
+    }
+    40% {
+        background: #ef4444;
+        box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.45);
+        transform: scale(1.25);
+    }
+}
+.modbus-traffic__bulb--flash-green {
+    animation: modbusTrafficFlashGreen 0.48s ease-out forwards;
+}
+.modbus-traffic__bulb--flash-red {
+    animation: modbusTrafficFlashRed 0.48s ease-out forwards;
+}

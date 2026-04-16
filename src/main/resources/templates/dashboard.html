@@ -64,7 +64,7 @@
 <body class="bg-[#FFF9F2] text-gray-900 h-screen overflow-hidden flex flex-col">
 
 <!-- Ensures Tailwind JIT sees utilities used only from Vue :class -->
-<div aria-hidden="true" class="hidden font-bold border border-gray-200 bg-gray-50 border-2 border-[#E6D82A] bg-[#FFF23E] border-[#4a9e44] bg-[#63BE5B] border-[#3d42b3] bg-[#4A54CF] hover:brightness-[0.97] brightness-[0.97] border-[#FFF23E]/60 border-[#63BE5B]/60 border-[#4A54CF]/60 bg-[#FFF23E]/20 bg-[#63BE5B]/20 bg-[#4A54CF]/20 text-gray-950 group/row group-hover/row:bg-gray-200 z-[60] hover:z-[35] translate-y-1.5 -translate-y-1.5 mb-1.5 mt-1.5 min-w-[7.5rem] min-w-[960px] max-w-[10.5rem] max-w-[min(10.5rem,calc(100vw-1rem))] max-w-[min(7.5rem,32vw)] max-h-[min(7.5rem,32vw)] break-words flex-[1_1_12rem] left-auto right-0 left-0 right-auto"></div>
+<div aria-hidden="true" class="hidden sr-only font-bold border border-gray-200 bg-gray-50 border-2 border-[#E6D82A] bg-[#FFF23E] border-[#4a9e44] bg-[#63BE5B] border-[#3d42b3] bg-[#4A54CF] hover:brightness-[0.97] brightness-[0.97] border-[#FFF23E]/60 border-[#63BE5B]/60 border-[#4A54CF]/60 bg-[#FFF23E]/20 bg-[#63BE5B]/20 bg-[#4A54CF]/20 text-gray-950 group/row group-hover/row:bg-gray-200 z-[60] hover:z-[35] translate-y-1.5 -translate-y-1.5 mb-1.5 mt-1.5 min-w-[7.5rem] min-w-[960px] max-w-[10.5rem] max-w-[min(10.5rem,calc(100vw-1rem))] max-w-[min(7.5rem,32vw)] max-h-[min(7.5rem,32vw)] break-words flex-[1_1_12rem] left-auto right-0 left-0 right-auto w-px h-4 bg-gray-200"></div>
 
 <div id="app" class="h-screen flex flex-col min-h-0" v-cloak
      th:attr="data-modbus-connected=${modbusConnected},data-modbus-error=${modbusError != null ? modbusError : ''},data-alert-repeat-interval-minutes=${alertRepeatIntervalMinutes},data-alert-max-repeats=${alertMaxRepeats},data-alert-gap-ms=${alertGapMs}">
@@ -93,6 +93,55 @@
                 <span class="relative flex h-3 w-3 shrink-0 rounded-full bg-amber-500"></span>
                 <span class="text-sm sm:text-base font-bold text-amber-950 tracking-wide">Device disconnected</span>
                 <a th:href="@{/admin/device-config}" class="text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline whitespace-nowrap shrink-0">Configure device</a>
+            </div>
+
+            <div
+                    class="modbus-traffic flex flex-wrap items-center gap-x-3 gap-y-1.5 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl border border-gray-200/90 bg-white/90 shadow-sm text-[0.65rem] sm:text-xs font-bold text-gray-600 tracking-wide max-w-full"
+                    role="status"
+                    aria-label="Modbus poll lamps: grey idle; each lamp flashes green on success or red on failure when a new poll completes">
+                <span class="modbus-traffic__pair flex items-center gap-1.5 shrink-0">
+                    <span class="modbus-traffic__label text-gray-500 font-semibold">IN</span>
+                    <span class="modbus-traffic__lamp flex items-center gap-0.5" title="Input read — transmit: green flash ok, red flash fail">
+                        <span class="sr-only">Input read transmit</span>
+                        <span
+                                class="modbus-traffic__bulb"
+                                :key="modbusFlashGeneration + '-inTx'"
+                                :class="modbusLampClass('inTx')"
+                                aria-hidden="true"></span>
+                        <span class="text-gray-400 font-semibold">TX</span>
+                    </span>
+                    <span class="modbus-traffic__lamp flex items-center gap-0.5" title="Input read — response: green flash ok, red flash fail">
+                        <span class="sr-only">Input read response</span>
+                        <span
+                                class="modbus-traffic__bulb"
+                                :key="modbusFlashGeneration + '-inRx'"
+                                :class="modbusLampClass('inRx')"
+                                aria-hidden="true"></span>
+                        <span class="text-gray-400 font-semibold">RX</span>
+                    </span>
+                </span>
+                <span class="hidden sm:inline w-px h-4 bg-gray-200 shrink-0" aria-hidden="true"></span>
+                <span class="modbus-traffic__pair flex items-center gap-1.5 shrink-0">
+                    <span class="modbus-traffic__label text-gray-500 font-semibold">OUT</span>
+                    <span class="modbus-traffic__lamp flex items-center gap-0.5" title="Relay writes — transmit: green flash ok, red flash fail">
+                        <span class="sr-only">Relay write transmit</span>
+                        <span
+                                class="modbus-traffic__bulb"
+                                :key="modbusFlashGeneration + '-outTx'"
+                                :class="modbusLampClass('outTx')"
+                                aria-hidden="true"></span>
+                        <span class="text-gray-400 font-semibold">TX</span>
+                    </span>
+                    <span class="modbus-traffic__lamp flex items-center gap-0.5" title="Relay writes — response: green flash ok, red flash fail">
+                        <span class="sr-only">Relay write response</span>
+                        <span
+                                class="modbus-traffic__bulb"
+                                :key="modbusFlashGeneration + '-outRx'"
+                                :class="modbusLampClass('outRx')"
+                                aria-hidden="true"></span>
+                        <span class="text-gray-400 font-semibold">RX</span>
+                    </span>
+                </span>
             </div>
 
             <div class="flex items-center gap-2 sm:gap-4 shrink-0">

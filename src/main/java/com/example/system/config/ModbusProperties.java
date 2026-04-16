@@ -31,4 +31,10 @@ public class ModbusProperties {
     private int pollIntervalMs = 5000;
     private boolean logEachRead = true;
     private int coilStartAddress = 0;
+
+    /**
+     * Milliseconds j2mod waits for each Modbus RTU response (FC04 reads and FC05 writes). Lower values fail faster
+     * on missing slaves; raise on slow RS‑485 segments (e.g. {@code system.modbus.response-timeout-ms=400}).
+     */
+    private int responseTimeoutMs = 200;
 }

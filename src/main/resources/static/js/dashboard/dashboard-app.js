@@ -83,7 +83,16 @@
                 _refreshInFlight: false,
                 mode: 'PRODUCTION',
                 speakerFrameIndex: 0,
-                _speakerAnimTimer: null
+                _speakerAnimTimer: null,
+                modbusPollCompletedAtMs: 0,
+                modbusReadTx: false,
+                modbusReadRx: false,
+                modbusWriteTx: false,
+                modbusWriteRx: false,
+                /** One-shot flash per lamp: null idle (grey), 'g' green blink, 'r' red blink */
+                modbusLampFlash: { inTx: null, inRx: null, outTx: null, outRx: null },
+                modbusFlashGeneration: 0,
+                _modbusLampFlashTimer: null
             };
         },
         computed: {
@@ -149,8 +158,34 @@
                 document.removeEventListener('keydown', this._gestureResumeAudio, { capture: true });
                 this._gestureResumeAudio = null;
             }
+            if (this._modbusLampFlashTimer != null) {
+                clearTimeout(this._modbusLampFlashTimer);
+                this._modbusLampFlashTimer = null;
+            }
         },
         methods: {
+            modbusLampClass(part) {
+                const k = this.modbusLampFlash[part];
+                if (k === 'g') return 'modbus-traffic__bulb--flash-green';
+                if (k === 'r') return 'modbus-traffic__bulb--flash-red';
+                return '';
+            },
+            scheduleModbusLampFlashes(readTx, readRx, writeTx, writeRx) {
+                if (this._modbusLampFlashTimer != null) {
+                    clearTimeout(this._modbusLampFlashTimer);
+                }
+                this.modbusFlashGeneration += 1;
+                this.modbusLampFlash = {
+                    inTx: readTx ? 'g' : 'r',
+                    inRx: readRx ? 'g' : 'r',
+                    outTx: writeTx ? 'g' : 'r',
+                    outRx: writeRx ? 'g' : 'r'
+                };
+                this._modbusLampFlashTimer = setTimeout(() => {
+                    this.modbusLampFlash = { inTx: null, inRx: null, outTx: null, outRx: null };
+                    this._modbusLampFlashTimer = null;
+                }, 480);
+            },
             startSpeakerAnimation() {
                 if (this._speakerAnimTimer != null) {
                     return;
@@ -552,6 +587,32 @@
 
                     this.modbusConnected = !!j.modbusConnected;
                     this.modbusError = j.modbusError || null;
+
+                    const tr = j.modbusTraffic && typeof j.modbusTraffic === 'object' ? j.modbusTraffic : {};
+                    const rawPoll = tr.pollCompletedAtMs;
+                    let pollMs = 0;
+                    if (typeof rawPoll === 'number' && Number.isFinite(rawPoll)) {
+                        pollMs = rawPoll;
+                    } else if (typeof rawPoll === 'string' && rawPoll.trim() !== '') {
+                        const n = Number(rawPoll);
+                        if (Number.isFinite(n)) {
+                            pollMs = n;
+                        }
+                    }
+                    this.modbusPollCompletedAtMs = pollMs;
+                    const readTx = !!tr.readTx;
+                    const readRx = !!tr.readRx;
+                    const writeTx = !!tr.writeTx;
+                    const writeRx = !!tr.writeRx;
+                    this.modbusReadTx = readTx;
+                    this.modbusReadRx = readRx;
+                    this.modbusWriteTx = writeTx;
+                    this.modbusWriteRx = writeRx;
+                    /* Flash on every dashboard sync when a poll snapshot exists (same pollCompletedAtMs across
+                     * refreshes is normal — Modbus interval can be longer than the UI refresh). */
+                    if (pollMs > 0) {
+                        this.scheduleModbusLampFlashes(readTx, readRx, writeTx, writeRx);
+                    }
                 } catch (e) {
                     console.error('Dashboard refresh error:', e);
                 } finally {

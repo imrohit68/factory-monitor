@@ -9,7 +9,9 @@
 
 <div class="flex-1 flex items-center justify-center px-6 py-12">
     <div class="max-w-md text-center space-y-3">
-        <iconify-icon icon="solar:check-circle-linear" class="text-5xl text-emerald-600 mx-auto block"></iconify-icon>
+        <div class="flex justify-center">
+            <iconify-icon icon="solar:check-circle-linear" class="text-5xl text-emerald-600"></iconify-icon>
+        </div>
         <h1 class="text-xl font-medium text-gray-900">Shutdown requested</h1>
         <p class="text-sm text-gray-600" th:if="${shutdownAutoCloseWindow}">
             The application is stopping. This window will close on its own in a few seconds.
