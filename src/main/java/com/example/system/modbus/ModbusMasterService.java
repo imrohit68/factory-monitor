@@ -25,6 +25,9 @@ public class ModbusMasterService {
 
     private static final Logger log = LoggerFactory.getLogger(ModbusMasterService.class);
 
+    /** Consecutive FC04 read failures required before closing the serial session. */
+    private static final int READ_FAILURES_BEFORE_DISCONNECT = 3;
+
     private enum UserErrorContext {
         OPEN_PORT,
         READ_INPUTS,
@@ -37,6 +40,9 @@ public class ModbusMasterService {
     private ModbusSerialMaster master;
     private volatile boolean connected;
     private volatile String lastError;
+
+    /** Only updated while holding {@link #lock} during {@link #readInputBits} or cleared in {@link #disconnectUnlocked}. */
+    private int consecutiveReadFailures;
 
     public ModbusMasterService(ModbusProperties props) {
         this.props = props;
@@ -68,6 +74,7 @@ public class ModbusMasterService {
             master.connect();
             connected = true;
             lastError = null;
+            consecutiveReadFailures = 0;
             log.info("Modbus serial connected on {}", props.getPortName());
         } catch (Exception e) {
             lastError = toUserFacingMessage(e, UserErrorContext.OPEN_PORT);
@@ -96,15 +103,29 @@ public class ModbusMasterService {
             int inputSlave = props.getInputSlaveId();
             InputRegister[] registers = master.readInputRegisters(inputSlave, regStart, regCount);
             boolean[] bits = registersToBits(registers, bitCount);
+            consecutiveReadFailures = 0;
+            lastError = null;
             if (props.isLogEachRead()) {
                 logSuccessfulRead(inputSlave, regStart, regCount, registers, bits);
             }
             return bits;
         } catch (Exception e) {
+            consecutiveReadFailures++;
+            if (consecutiveReadFailures < READ_FAILURES_BEFORE_DISCONNECT) {
+                log.warn(
+                        "Modbus FC04 read failed (inputSlave={}), consecutive failures {}/{} — keeping session open: {}",
+                        props.getInputSlaveId(),
+                        consecutiveReadFailures,
+                        READ_FAILURES_BEFORE_DISCONNECT,
+                        e.getMessage(),
+                        e);
+                return new boolean[bitCount];
+            }
             lastError = toUserFacingMessage(e, UserErrorContext.READ_INPUTS);
             log.warn(
-                    "Modbus FC04 read failed (inputSlave={}): {}",
+                    "Modbus FC04 read failed (inputSlave={}) after {} consecutive failures — disconnecting: {}",
                     props.getInputSlaveId(),
+                    consecutiveReadFailures,
                     e.getMessage(),
                     e);
             connected = false;
@@ -116,6 +137,7 @@ public class ModbusMasterService {
                 // ignore
             }
             master = null;
+            consecutiveReadFailures = 0;
             return new boolean[bitCount];
         } finally {
             lock.unlock();
@@ -252,6 +274,7 @@ public class ModbusMasterService {
 
     private void disconnectUnlocked() {
         connected = false;
+        consecutiveReadFailures = 0;
         if (master != null) {
             try {
                 master.disconnect();
