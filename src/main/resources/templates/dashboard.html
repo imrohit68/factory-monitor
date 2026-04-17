@@ -144,27 +144,34 @@
                 </span>
             </div>
 
-            <div class="flex items-center gap-2 sm:gap-4 shrink-0">
-                <button
-                        type="button"
-                        class="uc-motion p-2 sm:p-3.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg border border-transparent hover:border-gray-200 flex items-center justify-center"
-                        :title="playingKey != null ? 'Audio playing' : 'Audio idle'">
-                    <img v-if="playingKey != null"
-                         :src="speakerPlayingSrc"
-                         class="speaker-playing-icon w-20 h-20 sm:w-[6.875rem] sm:h-[6.875rem] md:w-[7.5rem] md:h-[7.5rem] shrink-0 object-contain max-w-[min(7.5rem,32vw)] max-h-[min(7.5rem,32vw)] sm:max-w-none sm:max-h-none"
-                         alt="Audio playing"
-                         aria-hidden="true"/>
-                    <img v-else
-                         th:src="@{/images/speaker-idle.png}"
-                         src="/images/speaker-idle.png"
-                         class="w-20 h-20 sm:w-[6.875rem] sm:h-[6.875rem] md:w-[7.5rem] md:h-[7.5rem] shrink-0 object-contain max-w-[min(7.5rem,32vw)] max-h-[min(7.5rem,32vw)] sm:max-w-none sm:max-h-none"
-                         alt="Audio idle"
-                         aria-hidden="true"/>
-                </button>
-                <a th:href="@{/login}" class="uc-motion flex items-center gap-2.5 sm:gap-3 px-5 sm:px-6 py-3 sm:py-3.5 bg-[#111111] text-white rounded-lg hover:bg-black active:scale-[0.98] shadow-sm text-base sm:text-lg font-bold tracking-wide">
-                    <iconify-icon icon="solar:login-2-linear" class="text-xl sm:text-2xl" stroke-width="1.5"></iconify-icon>
-                    <span class="hidden sm:inline">Login</span>
-                </a>
+            <div class="flex flex-col items-end gap-1.5 shrink-0">
+                <div class="flex items-center gap-2 sm:gap-4">
+                    <button
+                            type="button"
+                            class="uc-motion p-2 sm:p-3.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg border border-transparent hover:border-gray-200 flex items-center justify-center"
+                            :title="playingKey != null ? 'Audio playing' : 'Audio idle'">
+                        <img v-if="playingKey != null"
+                             :src="speakerPlayingSrc"
+                             class="speaker-playing-icon w-20 h-20 sm:w-[6.875rem] sm:h-[6.875rem] md:w-[7.5rem] md:h-[7.5rem] shrink-0 object-contain max-w-[min(7.5rem,32vw)] max-h-[min(7.5rem,32vw)] sm:max-w-none sm:max-h-none"
+                             alt="Audio playing"
+                             aria-hidden="true"/>
+                        <img v-else
+                             th:src="@{/images/speaker-idle.png}"
+                             src="/images/speaker-idle.png"
+                             class="w-20 h-20 sm:w-[6.875rem] sm:h-[6.875rem] md:w-[7.5rem] md:h-[7.5rem] shrink-0 object-contain max-w-[min(7.5rem,32vw)] max-h-[min(7.5rem,32vw)] sm:max-w-none sm:max-h-none"
+                             alt="Audio idle"
+                             aria-hidden="true"/>
+                    </button>
+                    <a th:href="@{/login}" class="uc-motion flex items-center gap-2.5 sm:gap-3 px-5 sm:px-6 py-3 sm:py-3.5 bg-[#111111] text-white rounded-lg hover:bg-black active:scale-[0.98] shadow-sm text-base sm:text-lg font-bold tracking-wide">
+                        <iconify-icon icon="solar:login-2-linear" class="text-xl sm:text-2xl" stroke-width="1.5"></iconify-icon>
+                        <span class="hidden sm:inline">Login</span>
+                    </a>
+                </div>
+                <span class="inline-flex items-center rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-semibold tracking-[0.08em] text-gray-700 shadow-sm whitespace-nowrap"
+                      role="status"
+                      :aria-label="mode === 'MAINTENANCE' ? 'Maintenance mode' : 'Production mode'">
+                    {{ mode === 'MAINTENANCE' ? 'Maintenance Mode' : 'Production Mode' }}
+                </span>
             </div>
         </div>
     </header>
@@ -179,9 +186,6 @@
                    aria-label="Production Calling System">
                     Production Calling System
                 </p>
-                <span class="inline-flex items-center rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-semibold tracking-[0.08em] text-gray-700 shadow-sm">
-                    {{ mode === 'MAINTENANCE' ? 'Maintenance Mode' : 'Production Mode' }}
-                </span>
             </div>
         </div>
 
