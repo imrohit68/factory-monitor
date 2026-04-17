@@ -155,7 +155,7 @@ public class AudioAlertPreviewService {
         if (dot < 0 || dot >= originalFilename.length() - 1) {
             return "";
         }
-        String e = originalFilename.substring(dot + 1);
+        String e = originalFilename.substring(dot + 1).trim();
         if (e.length() > 8) {
             return "";
         }

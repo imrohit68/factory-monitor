@@ -33,6 +33,8 @@ public class AudioStorageService {
             Set.of(
                     "audio/mpeg",
                     "audio/mp3",
+                    "audio/mpg",
+                    "audio/x-mp3",
                     "audio/wav",
                     "audio/wave",
                     "audio/x-wav",
@@ -202,7 +204,7 @@ public class AudioStorageService {
         if (dot < 0 || dot >= originalFilename.length() - 1) {
             return "";
         }
-        String e = originalFilename.substring(dot + 1);
+        String e = originalFilename.substring(dot + 1).trim();
         if (e.length() > 8) {
             return "";
         }

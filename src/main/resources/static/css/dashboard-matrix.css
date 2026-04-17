@@ -314,16 +314,23 @@ col.matrix-col-label {
     line-height: 1.25;
     min-width: 0;
 }
-/* Exactly three lines: one line per address row; ellipsis if the row would wrap */
+/* Address rows: on wide viewports show full text (wrap if the header flex layout is tight).
+   Ellipsis only when the viewport is narrowed — matches “truncate only on smaller screens”. */
 #app .dashboard-header-address .company-address-lines {
     min-width: 0;
 }
 #app .dashboard-header-address .company-address-lines .block {
     display: block;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: normal;
+    overflow: visible;
     max-width: 100%;
+}
+@media (max-width: 1023px) {
+    #app .dashboard-header-address .company-address-lines .block {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
 }
 #app .dashboard-header-tools {
     min-width: 0;
@@ -373,18 +380,27 @@ col.matrix-col-label {
 }
 #app .dashboard-header-login-wrap .dashboard-mode-pill {
     position: absolute;
-    left: 0;
-    right: 0;
+    left: 50%;
+    right: auto;
     top: calc(100% + 0.32rem);
+    transform: translateX(-50%);
     box-sizing: border-box;
+    width: max-content;
     max-width: 100%;
-    font-size: clamp(0.55rem, 0.72vw + 0.38vh, 0.875rem);
-    padding: clamp(0.1rem, 0.62vh, 0.28rem) clamp(0.28rem, 1.75vw, 0.8rem);
-    line-height: 1.15;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    row-gap: 0.1em;
+    font-size: clamp(0.75rem, 0.85vw + 0.42vh, 0.875rem);
+    padding: 0.5rem 1rem;
+    line-height: 1.2;
     z-index: 5;
+}
+#app .dashboard-header-login-wrap .dashboard-mode-pill__line {
+    display: block;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    line-height: 1.2;
 }
 #app .dashboard-header-speaker-btn {
     padding: clamp(0.35rem, 1.25vh + 0.25vw, 1.1rem) clamp(0.35rem, 1.1vw, 1rem);

@@ -265,7 +265,6 @@
         var objectUrls = { eng: null, lead: null, qc: null };
         var previewControllers = { eng: null, lead: null, qc: null };
         var serverPreviewIds = { eng: null, lead: null, qc: null };
-        var MP3_EXT = /\.mp3$/i;
         var PREVIEW_URL_ID = /\/admin\/workstations\/audio-preview\/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})\.mp3/i;
         var UNSUPPORTED_TYPE_MSG = 'This file type is not supported. Use MP3, WAV, or OGG only.';
 
@@ -325,21 +324,27 @@
 
         /**
          * Mirrors server rules: if the filename has an extension, only mp3 / wav / ogg are accepted (not e.g. .oga).
-         * If there is no extension, allowed audio/* MIME types may qualify (same as {@code AudioStorageService}).
+         * Extension is trimmed so names like "alert.mp3 " match the server (same as {@code AudioStorageService}).
+         * If there is no extension, allowed audio/* MIME types may qualify.
          */
+        function audioExtLower(name) {
+            var n = name || '';
+            var dot = n.lastIndexOf('.');
+            if (dot < 0 || dot >= n.length - 1) return '';
+            var ext = n.substring(dot + 1).toLowerCase().trim();
+            if (ext.length > 8) return '';
+            return ext;
+        }
+
         function isChosenFileAudio(file) {
             if (!file) return true;
-            var name = file.name || '';
-            var dot = name.lastIndexOf('.');
-            var ext = dot >= 0 && dot < name.length - 1 ? name.substring(dot + 1).toLowerCase() : '';
-            if (ext.length > 8) {
-                ext = '';
-            }
+            var ext = audioExtLower(file.name || '');
             if (ext) {
                 return ext === 'mp3' || ext === 'wav' || ext === 'ogg';
             }
             var t = (file.type || '').toLowerCase().split(';')[0].trim();
-            return t === 'audio/mpeg' || t === 'audio/mp3' || t === 'audio/wav' || t === 'audio/wave'
+            return t === 'audio/mpeg' || t === 'audio/mp3' || t === 'audio/mpg' || t === 'audio/x-mp3'
+                || t === 'audio/wav' || t === 'audio/wave'
                 || t === 'audio/x-wav' || t === 'audio/ogg' || t === 'application/ogg';
         }
 
@@ -369,8 +374,10 @@
                 if (!slot) return;
                 if (err && err.name === 'NotAllowedError') {
                     showAudioFieldMessage(slot, 'Tap Play again — the browser required a click or tap on this page first.');
+                } else if (err && err.name === 'NotSupportedError') {
+                    showAudioFieldMessage(slot, 'This browser cannot decode that audio. Try another file or format.');
                 } else {
-                    showAudioFieldMessage(slot, 'This file does not play as supported audio. Use a valid MP3, WAV, or OGG file.');
+                    showAudioFieldMessage(slot, 'Playback failed. Use a valid MP3, WAV, or OGG file, or tap Play to try again.');
                 }
             });
         };
@@ -450,15 +457,7 @@
             }
 
             if (file) {
-                var name = file.name || '';
-                if (MP3_EXT.test(name)) {
-                    var blobUrl = URL.createObjectURL(file);
-                    objectUrls[slot] = blobUrl;
-                    playBtn.setAttribute('data-audio-src', blobUrl);
-                    setPlayUi(playBtn, true);
-                    window.playWorkstationAudioPreview(playBtn);
-                    return;
-                }
+                /* Always use server preview URL (correct Content-Type). Blob URLs often fail in JavaFX WebView for MP3. */
                 startServerPreview(slot, file, fileInput, playBtn, clearCheckbox);
                 return;
             }
