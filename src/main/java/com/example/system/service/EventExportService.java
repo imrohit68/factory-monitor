@@ -51,17 +51,19 @@ public class EventExportService {
     private final ApplicationOperationMode applicationOperationMode;
 
     /**
-     * Writes all {@code event_log} rows with {@code event_time} in the inclusive local date range
-     * {@code [start, end]}, as UTF-8 CSV (with BOM for Excel). Append-only: both OPEN and CLOSED rows
-     * appear. The last two columns are {@code event_date} ({@code yyyy-MM-dd}) and {@code event_time}
-     * ({@code HH:mm:ss}) in the JVM default time zone, second precision only (no fractional seconds).
+     * Writes {@code event_log} rows for the {@linkplain ApplicationOperationMode#getCurrentMode() current
+     * operation mode} with non-null {@code mode}, whose {@code event_time} falls in the inclusive local date
+     * range {@code [start, end]}, as UTF-8 CSV (with BOM for Excel). A title line names the mode; append-only:
+     * both OPEN and CLOSED rows appear. The last two columns are {@code event_date} ({@code yyyy-MM-dd}) and
+     * {@code event_time} ({@code HH:mm:ss}) in the JVM default time zone, second precision only (no fractional
+     * seconds).
      * <p>
      * Sets HTTP headers, filename, BOM, and body. Call after binding dates; propagates validation errors
      * from {@link #validateRange}.
      */
     public void writeCsvAttachment(LocalDate start, LocalDate end, HttpServletResponse response) throws IOException {
         List<EventRecord> rows = loadEventsInRange(start, end);
-        String filename = String.format("event-log-%s-to-%s.csv", start, end);
+        String filename = exportFilenameBase(start, end, "csv");
         response.setContentType("text/csv; charset=UTF-8");
         response.setHeader(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"");
         writeCsvBody(rows, response.getOutputStream());
@@ -69,7 +71,7 @@ public class EventExportService {
     }
 
     /**
-     * Writes CSV bytes to {@code out} for {@code [start, end]} (inclusive local dates). Same columns as
+     * Writes CSV bytes to {@code out} for {@code [start, end]} (inclusive local dates). Same shape as
      * {@link #writeCsvAttachment}; {@code event_date} / {@code event_time} use {@link ZoneId#systemDefault()}.
      */
     public void writeCsv(LocalDate start, LocalDate end, OutputStream out) throws IOException {
@@ -78,12 +80,13 @@ public class EventExportService {
     }
 
     /**
-     * Writes event rows in {@code [start, end]} as a PDF table. Same data window and event date/time columns
-     * as CSV ({@code event_date} / {@code event_time} in {@link ZoneId#systemDefault()}, second precision).
+     * Writes event rows in {@code [start, end]} for the current operation mode (non-null {@code mode} only)
+     * as a PDF table. Same data window and event date/time columns as CSV ({@code event_date} /
+     * {@code event_time} in {@link ZoneId#systemDefault()}, second precision).
      */
     public void writePdfAttachment(LocalDate start, LocalDate end, HttpServletResponse response) throws IOException {
         List<EventRecord> rows = loadEventsInRange(start, end);
-        String filename = String.format("event-log-%s-to-%s.pdf", start, end);
+        String filename = exportFilenameBase(start, end, "pdf");
         response.setContentType("application/pdf");
         response.setHeader(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"");
         writePdfBody(rows, start, end, response.getOutputStream());
@@ -96,18 +99,28 @@ public class EventExportService {
         Instant from = start.atStartOfDay(z).toInstant();
         Instant to = end.plusDays(1).atStartOfDay(z).toInstant();
         OperationMode mode = applicationOperationMode.getCurrentMode();
-        return events.findByEventTimeRangeAndModeOrderByEventTimeAsc(
-                from,
-                to,
-                mode,
-                mode == OperationMode.PRODUCTION);
+        return events.findByEventTimeRangeAndModeOrderByEventTimeAsc(from, to, mode);
+    }
+
+    private String exportFilenameBase(LocalDate start, LocalDate end, String extension) {
+        OperationMode mode = applicationOperationMode.getCurrentMode();
+        return String.format(
+                "event-log-%s-%s-to-%s.%s",
+                mode.name().toLowerCase(Locale.ROOT), start, end, extension);
+    }
+
+    private String exportTitleLine() {
+        return applicationOperationMode.getCurrentMode().getDisplayName() + " — Event log";
     }
 
     private void writeCsvBody(List<EventRecord> rows, OutputStream out) throws IOException {
         ZoneId zone = ZoneId.systemDefault();
         try (OutputStreamWriter w = new OutputStreamWriter(out, StandardCharsets.UTF_8)) {
             w.write('\uFEFF');
-            w.write("id,mapping_id,input_bit_index,output_slave_id,output_channel,status,mode,event_date,event_time\n");
+            w.write(exportTitleLine());
+            w.write('\n');
+            w.write('\n');
+            w.write("id,mapping_id,input_bit_index,output_slave_id,output_channel,status,event_date,event_time\n");
             for (EventRecord e : rows) {
                 w.write(Long.toString(e.getId()));
                 w.write(',');
@@ -120,8 +133,6 @@ public class EventExportService {
                 w.write(Integer.toString(e.getOutputChannel()));
                 w.write(',');
                 w.write(escapeCsv(e.getStatus() == null ? "" : e.getStatus().name()));
-                w.write(',');
-                w.write(escapeCsv(e.getMode() == null ? "" : e.getMode().name()));
                 w.write(',');
                 appendCsvEventDateTime(e.getEventTime(), zone, w);
                 w.write('\n');
@@ -166,7 +177,7 @@ public class EventExportService {
             document.open();
 
             Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 14f);
-            document.add(new Paragraph("Event log", titleFont));
+            document.add(new Paragraph(exportTitleLine(), titleFont));
             Font subFont = FontFactory.getFont(FontFactory.HELVETICA, 10f);
             Font periodLabelFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10f);
             Phrase periodLine = new Phrase();
@@ -179,9 +190,9 @@ public class EventExportService {
             Font cellFont = FontFactory.getFont(FontFactory.HELVETICA, 7.5f);
 
             ZoneId zone = ZoneId.systemDefault();
-            PdfPTable table = new PdfPTable(9);
+            PdfPTable table = new PdfPTable(8);
             table.setWidthPercentage(100);
-            table.setWidths(new float[] {0.6f, 0.9f, 0.8f, 0.9f, 0.9f, 0.75f, 1.0f, 1.1f, 1.6f});
+            table.setWidths(new float[] {0.65f, 1.0f, 0.85f, 1.0f, 1.0f, 0.85f, 1.15f, 1.7f});
             table.setSpacingBefore(4f);
 
             String[] headers = {
@@ -191,7 +202,6 @@ public class EventExportService {
                 "Output slave",
                 "Output channel",
                 "Status",
-                "Mode",
                 "Event date",
                 "Event time"
             };
@@ -211,7 +221,6 @@ public class EventExportService {
                 table.addCell(dataCell(Integer.toString(e.getOutputChannel()), cellFont, bg));
                 table.addCell(
                         dataCell(e.getStatus() == null ? "" : e.getStatus().name(), cellFont, bg));
-                table.addCell(dataCell(e.getMode() == null ? "" : e.getMode().name(), cellFont, bg));
                 table.addCell(dataCell(formatExportEventDate(e.getEventTime(), zone), cellFont, bg));
                 table.addCell(dataCell(formatExportEventTime(e.getEventTime(), zone), cellFont, bg));
                 i++;

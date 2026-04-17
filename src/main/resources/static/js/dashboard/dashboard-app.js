@@ -79,7 +79,6 @@
                 _mainPollInterval: null,
                 _visibilityHandler: null,
                 _beforeUnloadHandler: null,
-                _gestureResumeAudio: null,
                 _refreshInFlight: false,
                 mode: 'PRODUCTION',
                 speakerFrameIndex: 0,
@@ -128,14 +127,6 @@
             };
             window.addEventListener('beforeunload', this._beforeUnloadHandler);
             window.addEventListener('pagehide', this._beforeUnloadHandler);
-
-            this._gestureResumeAudio = (e) => {
-                if (document.hidden) return;
-                if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
-                this.refresh();
-            };
-            document.addEventListener('pointerdown', this._gestureResumeAudio, { capture: true, passive: true });
-            document.addEventListener('keydown', this._gestureResumeAudio, { capture: true });
         },
         beforeUnmount() {
             this.stopSpeakerAnimation();
@@ -152,11 +143,6 @@
                 window.removeEventListener('beforeunload', this._beforeUnloadHandler);
                 window.removeEventListener('pagehide', this._beforeUnloadHandler);
                 this._beforeUnloadHandler = null;
-            }
-            if (this._gestureResumeAudio) {
-                document.removeEventListener('pointerdown', this._gestureResumeAudio, { capture: true });
-                document.removeEventListener('keydown', this._gestureResumeAudio, { capture: true });
-                this._gestureResumeAudio = null;
             }
             if (this._modbusLampFlashTimer != null) {
                 clearTimeout(this._modbusLampFlashTimer);
@@ -299,9 +285,8 @@
                     const res = await fetch('/api/dashboard/simulation/toggle/' + slot.slotId, { method: 'POST' });
                     if (!res.ok) {
                         console.warn('Simulation toggle failed:', res.status);
-                        return;
                     }
-                    await this.refresh();
+                    // Matrix `active` comes from server poll() FSM; interval refresh() picks it up.
                 } catch (e) {
                     console.error('Simulation toggle error:', e);
                 }

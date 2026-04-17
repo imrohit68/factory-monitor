@@ -22,16 +22,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 @Service
 public class OrchestrationService {
 
     private static final Logger log = LoggerFactory.getLogger(OrchestrationService.class);
-
-    /** Disconnect serial Modbus after this many consecutive polls where a hardware read or write failed. */
-    private static final int CONSECUTIVE_MODBUS_FAILURE_POLLS_BEFORE_DISCONNECT = 3;
 
     private final ModbusProperties modbus;
     private final ModbusMasterService modbusMaster;
@@ -47,9 +43,6 @@ public class OrchestrationService {
     private final ConcurrentMap<Long, Long> openEventIdsBySlotId = new ConcurrentHashMap<>();
     private final AtomicReference<ModbusTrafficSnapshot> modbusTrafficSnapshot =
             new AtomicReference<>(ModbusTrafficSnapshot.initial());
-
-    /** Consecutive polls (while connected) with a failed Modbus read and/or relay write. */
-    private final AtomicInteger consecutiveModbusFailurePolls = new AtomicInteger(0);
 
     public OrchestrationService(
             ModbusProperties modbus,
@@ -85,7 +78,6 @@ public class OrchestrationService {
         boolean readTx;
         boolean readRx;
         boolean[] bits;
-        boolean readPollFailed = false;
         if (applicationOperationMode.isMaintenanceMode()) {
             bits = simulationInputService.readBits(bitCount);
             readTx = true;
@@ -96,7 +88,6 @@ public class OrchestrationService {
             readTx = readResult.attempted();
             readRx = readResult.responseOk();
             if (readResult.attempted() && !readResult.responseOk()) {
-                readPollFailed = true;
                 log.warn("Modbus input read failed this poll.");
             }
         }
@@ -104,7 +95,7 @@ public class OrchestrationService {
         Set<Long> activeSlotIds = Set.copyOf(slots.stream().map(WorkstationSlot::getId).toList());
         channelBySlotId.keySet().removeIf(id -> !activeSlotIds.contains(id));
 
-        // read bits → FSM (dashboard / persistence / alerts) → relay writes → streak → traffic snapshot
+        // read bits → FSM (dashboard / persistence / alerts) → relay writes → Modbus TX/RX lamp snapshot (last)
         for (WorkstationSlot slot : slots) {
             int idx = slot.getInputBitIndex();
             boolean level = idx >= 0 && idx < bits.length && bits[idx];
@@ -114,7 +105,6 @@ public class OrchestrationService {
 
         int writesTransmitted = 0;
         int writesFailed = 0;
-        boolean writePollFailed = false;
         if (modbusMaster.isConnected()) {
             for (WorkstationSlot slot : slots) {
                 int idx = slot.getInputBitIndex();
@@ -126,7 +116,6 @@ public class OrchestrationService {
                     writesTransmitted++;
                     if (!wr.responseOk()) {
                         writesFailed++;
-                        writePollFailed = true;
                         log.warn(
                                 "Relay write failed (slave={} relay={}). Loop skipping because write failed — remaining relay writes skipped this poll.",
                                 slot.getOutputSlaveId(),
@@ -137,39 +126,11 @@ public class OrchestrationService {
             }
         }
 
-        updateModbusFailureStreak(readPollFailed, writePollFailed);
         boolean writeTx = writesTransmitted > 0;
         boolean writeRx = writesTransmitted > 0 && writesFailed == 0;
         modbusTrafficSnapshot.set(
                 new ModbusTrafficSnapshot(
                         System.currentTimeMillis(), readTx, readRx, writeTx, writeRx));
-    }
-
-    /**
-     * While disconnected, clears the streak. While connected, increments on any read or write failure in this poll
-     * and disconnects after three consecutive failed polls.
-     */
-    private void updateModbusFailureStreak(boolean readPollFailed, boolean writePollFailed) {
-        if (!modbusMaster.isConnected()) {
-            consecutiveModbusFailurePolls.set(0);
-            return;
-        }
-        if (readPollFailed || writePollFailed) {
-            int s = consecutiveModbusFailurePolls.incrementAndGet();
-            if (s == 1) {
-                log.warn("Will disconnect device if next 2 polls fail.");
-            } else if (s == 2) {
-                log.warn("Will disconnect device on next 1 failed poll.");
-            } else if (s >= CONSECUTIVE_MODBUS_FAILURE_POLLS_BEFORE_DISCONNECT) {
-                log.warn("Modbus read or write failed for the third consecutive poll — disconnecting device.");
-                modbusMaster.disconnectWithMessage(
-                        "Serial device disconnected after repeated Modbus read/write failures. Check the connection"
-                                + " and Configure device, then save again.");
-                consecutiveModbusFailurePolls.set(0);
-            }
-        } else {
-            consecutiveModbusFailurePolls.set(0);
-        }
     }
 
     private void openLine(WorkstationSlot slot) {

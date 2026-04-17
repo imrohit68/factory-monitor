@@ -25,9 +25,6 @@ public class ModbusMasterService {
 
     private static final Logger log = LoggerFactory.getLogger(ModbusMasterService.class);
 
-    /** Consecutive FC04 read failures required before closing the serial session. */
-    private static final int READ_FAILURES_BEFORE_DISCONNECT = 3;
-
     private enum UserErrorContext {
         OPEN_PORT,
         READ_INPUTS,
@@ -43,8 +40,7 @@ public class ModbusMasterService {
 
     /**
      * When false, {@link #ensureConnected()} will not open a new serial session until {@link #reconnect(String)} runs
-     * (e.g. user saves port in Configure device). Prevents reconnect storms after repeated FC04 failures or
-     * {@link #disconnectWithMessage(String)}.
+     * (e.g. user saves port in Configure device). Set false only from {@link #disconnectWithMessage(String)}.
      */
     private volatile boolean autoConnectEnabled = true;
 
@@ -132,28 +128,13 @@ public class ModbusMasterService {
             return new ModbusInputReadResult(bits, true, true);
         } catch (Exception e) {
             consecutiveReadFailures++;
-            if (consecutiveReadFailures < READ_FAILURES_BEFORE_DISCONNECT) {
-                log.warn(
-                        "Modbus FC04 read failed (inputSlave={}), consecutive failures {}/{} — keeping session open: {}",
-                        props.getInputSlaveId(),
-                        consecutiveReadFailures,
-                        READ_FAILURES_BEFORE_DISCONNECT,
-                        e.getMessage(),
-                        e);
-                return new ModbusInputReadResult(new boolean[bitCount], true, false);
-            }
             lastError = toUserFacingMessage(e, UserErrorContext.READ_INPUTS);
             log.warn(
-                    "Modbus FC04 read failed (inputSlave={}) after {} consecutive failures — disconnecting: {}",
+                    "Modbus FC04 read failed (inputSlave={}), consecutive failures {} — session stays open: {}",
                     props.getInputSlaveId(),
                     consecutiveReadFailures,
                     e.getMessage(),
                     e);
-            disconnectUnlocked();
-            autoConnectEnabled = false;
-            log.info(
-                    "Modbus auto-reconnect disabled after repeated read failures; use Configure device and save to"
-                            + " reconnect.");
             return new ModbusInputReadResult(new boolean[bitCount], true, false);
         } finally {
             lock.unlock();

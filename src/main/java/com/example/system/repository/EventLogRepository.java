@@ -19,13 +19,12 @@ public interface EventLogRepository extends JpaRepository<EventRecord, Long> {
     @Query(
             "select e from EventRecord e "
                     + "where e.eventTime >= :startInclusive and e.eventTime < :endExclusive "
-                    + "and (e.mode = :mode or (:includeNullMode = true and e.mode is null)) "
+                    + "and e.mode = :mode "
                     + "order by e.eventTime asc")
     List<EventRecord> findByEventTimeRangeAndModeOrderByEventTimeAsc(
             @Param("startInclusive") Instant startInclusive,
             @Param("endExclusive") Instant endExclusive,
-            @Param("mode") OperationMode mode,
-            @Param("includeNullMode") boolean includeNullMode);
+            @Param("mode") OperationMode mode);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("delete from EventRecord e where e.eventTime < :before")
