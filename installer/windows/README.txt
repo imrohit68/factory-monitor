@@ -22,6 +22,8 @@ Regenerate installer/windows/app-icon.ico after changing the SVG (from repo root
 
 On Windows without magick, use any tool that exports a multi-size .ico (16–256 px) from the SVG with transparency preserved.
 
+Do not rename a .png to .ico — NSIS and Windows require a real ICO container (ImageMagick “icon:auto-resize” or an ICO exporter). A PNG file with an .ico extension will fail with “invalid icon file”.
+
 ffmpeg.exe (Windows installer / OGG alert audio)
 -----------------------------------------------
 The production app transcodes OGG uploads to MP3 using FFmpeg. The Windows build script
