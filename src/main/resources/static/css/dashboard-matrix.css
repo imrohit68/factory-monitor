@@ -1,9 +1,86 @@
 body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
 
+/* -------------------------------------------------------------------------- */
+/* Dashboard shell — padding, type, and gaps shrink when width OR height     */
+/* is reduced (min(vw, dvh)-style clamps) so the layout compacts vs clipping. */
+/* -------------------------------------------------------------------------- */
+#app .dashboard-header {
+    padding-block: clamp(0.35rem, min(1.6vw, 2dvh), 1.35rem);
+    padding-inline: clamp(0.5rem, min(2.2vw, 2.5dvh), 2rem);
+    row-gap: clamp(0.3rem, min(1.2vw, 1.8dvh), 1rem);
+    column-gap: clamp(0.45rem, min(1.8vw, 2.2dvh), 1.75rem);
+}
+#app .dashboard-header-brand {
+    column-gap: clamp(0.45rem, min(2vw, 2.4dvh), 1.5rem);
+}
+#app .dashboard-header-logo {
+    width: clamp(2.35rem, min(7.5vw, 8.5dvh), 4rem);
+    height: clamp(2.35rem, min(7.5vw, 8.5dvh), 4rem);
+}
+#app .dashboard-header-title {
+    font-size: clamp(0.9rem, min(2.1vw, 2.8dvh), 1.5rem);
+}
+#app .dashboard-header-address {
+    margin-top: clamp(0.08rem, min(0.5vw, 0.7dvh), 0.35rem);
+    font-size: clamp(0.62rem, min(1.35vw, 1.85dvh), 1rem);
+}
+#app .dashboard-header-tools {
+    row-gap: clamp(0.3rem, min(1.2vw, 1.8dvh), 1rem);
+    column-gap: clamp(0.4rem, min(1.6vw, 2dvh), 1.75rem);
+}
+#app .dashboard-header-user {
+    row-gap: clamp(0.1rem, min(0.7vw, 1dvh), 0.45rem);
+}
+#app .dashboard-header-user-row {
+    column-gap: clamp(0.3rem, min(1.4vw, 1.8dvh), 1rem);
+}
+#app .dashboard-header-speaker-btn {
+    padding: clamp(0.2rem, min(0.9vw, 1.2dvh), 0.85rem);
+}
+#app .dashboard-header-speaker {
+    width: clamp(2.25rem, min(9vw, 11dvh), 7.5rem);
+    height: clamp(2.25rem, min(9vw, 11dvh), 7.5rem);
+}
+#app .dashboard-login-btn {
+    column-gap: clamp(0.3rem, min(1.1vw, 1.4dvh), 0.75rem);
+    padding: clamp(0.4rem, min(1.4vw, 1.9dvh), 0.9rem) clamp(0.55rem, min(2.2vw, 2.8dvh), 1.5rem);
+    font-size: clamp(0.78rem, min(1.7vw, 2.2dvh), 1.125rem);
+}
+#app .dashboard-login-icon {
+    font-size: clamp(0.95rem, min(2.5vw, 3.2dvh), 1.5rem);
+    width: 1em;
+    height: 1em;
+}
+#app .dashboard-mode-pill {
+    font-size: clamp(0.55rem, min(1.25vw, 1.65dvh), 0.75rem);
+    padding: clamp(0.1rem, min(0.55vw, 0.75dvh), 0.25rem) clamp(0.4rem, min(1.4vw, 1.85dvh), 0.75rem);
+}
+#app .dashboard-alert-bar {
+    padding: clamp(0.3rem, min(1.1vw, 1.5dvh), 0.65rem) clamp(0.55rem, min(1.9vw, 2.4dvh), 1.5rem);
+    font-size: clamp(0.68rem, min(1.45vw, 1.9dvh), 0.875rem);
+}
+#app .dashboard-main {
+    padding-inline: clamp(0.45rem, min(1.9vw, 2.8dvh), 2rem);
+    padding-block: clamp(0.15rem, min(0.85vw, 1.2dvh), 0.65rem) clamp(0.3rem, min(1.35vw, 1.85dvh), 1.5rem);
+    row-gap: clamp(0.1rem, min(0.7vw, 1dvh), 0.45rem);
+}
+#app .dashboard-title-wrap {
+    padding-block: clamp(0, min(0.45vw, 0.55dvh), 0.3rem);
+}
+#app .dashboard-matrix-block {
+    padding-bottom: clamp(0.15rem, min(0.85vw, 1.2dvh), 0.75rem);
+}
+#app .dashboard-header .modbus-traffic {
+    padding: clamp(0.18rem, min(0.75vw, 1vmin), 0.5rem) clamp(0.3rem, min(1vw, 1.35vmin), 0.75rem);
+    column-gap: clamp(0.3rem, min(1vw, 1.35vmin), 0.75rem);
+    row-gap: clamp(0.12rem, min(0.55vw, 0.75vmin), 0.45rem);
+    font-size: clamp(0.52rem, min(1vw, 1.3vmin), 0.75rem);
+}
+
 /* Center title between nav and matrix (matches board-style weight) */
 .dashboard-project-title {
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    font-size: clamp(1.15rem, 2.8vw, 2.35rem);
+    font-size: clamp(0.72rem, 0.32rem + min(3.2vw, 4.5dvh), 2.35rem);
     color: #305cde;
     margin: 0;
     padding: 0;
@@ -16,11 +93,13 @@ body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
         line-height: 1.2;
     }
 }
-/* Production matrix — matches physical board: 4×17, thick black grid */
+/* Production matrix — matches physical board: 4×N; grid scales with viewport */
 .matrix-table {
     width: 100%;
+    max-width: 100%;
+    min-width: 0;
     border-collapse: collapse;
-    border: 5px solid #000;
+    border: clamp(2px, 0.45vmin, 5px) solid #000;
     table-layout: fixed;
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     font-weight: 700;
@@ -28,7 +107,7 @@ body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
 }
 .matrix-table th,
 .matrix-table td {
-    border: 5px solid #000;
+    border: clamp(2px, 0.45vmin, 5px) solid #000;
     box-sizing: border-box;
     vertical-align: middle;
     text-align: center;
@@ -36,30 +115,29 @@ body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
 .matrix-table thead th {
     background: #fff;
     color: #000;
-    font-size: clamp(0.85rem, 1.5vw, 1.1rem);
-    padding: 0.35rem 0.2rem;
-    min-height: 2.75rem;
+    font-size: clamp(0.62rem, 0.42rem + min(1.1vw, 1.5dvh), 1.1rem);
+    padding: clamp(0.12rem, min(0.6vw, 0.9dvh), 0.35rem) clamp(0.08rem, min(0.45vw, 0.65dvh), 0.2rem);
+    min-height: clamp(1.65rem, min(4.5vw, 6dvh), 2.75rem);
 }
 /* Workstation / machine number columns (1, 2, WC1, …) — larger than default thead */
 .matrix-table thead th:not(.matrix__corner) {
-    font-size: clamp(1.05rem, 2.35vw, 1.55rem);
-    padding: 0.5rem 0.3rem;
-    min-height: 3.1rem;
+    font-size: clamp(0.58rem, 0.38rem + min(1.35vw, 2dvh), 1.55rem);
+    padding: clamp(0.15rem, min(0.75vw, 1.1dvh), 0.5rem) clamp(0.06rem, min(0.5vw, 0.75dvh), 0.3rem);
+    min-height: clamp(1.75rem, min(5vw, 6.5dvh), 3.1rem);
     letter-spacing: 0.02em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-/* First column width: <col class="matrix-col-label"> + table-layout fixed */
+/* First column: shrinks when the viewport is narrow or short */
 col.matrix-col-label {
-    width: 12.5rem;
-    min-width: 12.5rem;
+    width: clamp(2.85rem, calc(1rem + 9vmin), 12.5rem);
 }
 
 /* Top-left: column vs row header labels, diagonal split (physical board style) */
 .matrix-table thead th.matrix__corner {
     position: relative;
-    min-height: 4.5rem;
+    min-height: clamp(2.35rem, min(6.5vw, 8.5dvh), 4.5rem);
     padding: 0;
     vertical-align: middle;
     background: #e5e7eb;
@@ -82,7 +160,7 @@ col.matrix-col-label {
 .matrix__corner-inner {
     position: relative;
     z-index: 2;
-    min-height: 4.25rem;
+    min-height: clamp(2.15rem, min(6vw, 8dvh), 4.25rem);
     height: 100%;
 }
 /* Keep upper text to the right side of the corner. */
@@ -92,7 +170,7 @@ col.matrix-col-label {
     right: 0.32rem;
     left: 55%;
     text-align: right;
-    font-size: clamp(0.38rem, 0.7vw, 0.58rem);
+    font-size: clamp(0.22rem, min(0.65vw, 0.85dvh), 0.58rem);
     line-height: 1.12;
     font-weight: 700;
     text-transform: uppercase;
@@ -106,7 +184,7 @@ col.matrix-col-label {
     left: 0.32rem;
     right: 55%;
     text-align: left;
-    font-size: clamp(0.38rem, 0.7vw, 0.58rem);
+    font-size: clamp(0.22rem, min(0.65vw, 0.85dvh), 0.58rem);
     line-height: 1.12;
     font-weight: 700;
     text-transform: uppercase;
@@ -118,10 +196,10 @@ col.matrix-col-label {
 }
 .matrix__label {
     text-align: left !important;
-    padding: 0.35rem 0.4rem !important;
+    padding: clamp(0.15rem, min(0.65vw, 0.95dvh), 0.35rem) clamp(0.18rem, min(0.75vw, 1.05dvh), 0.4rem) !important;
     background: #fff !important;
     font-weight: 700;
-    min-height: 3.5rem;
+    min-height: clamp(2rem, min(5.5vw, 7dvh), 3.5rem);
     vertical-align: middle;
     box-sizing: border-box;
 }
@@ -133,13 +211,13 @@ col.matrix-col-label {
     justify-content: flex-start;
     width: 100%;
     max-width: 100%;
-    gap: 0.35rem;
-    min-height: 2.75rem;
+    gap: clamp(0.15rem, min(0.55vw, 0.75dvh), 0.35rem);
+    min-height: clamp(1.6rem, min(4.5vw, 6dvh), 2.75rem);
     box-sizing: border-box;
 }
 .matrix__label-text {
     /* ENGINEERS / LEADER / QUALITY + CONTROLLER — must not overlap badge letter */
-    font-size: clamp(0.65rem, 1.35vw, 1.05rem);
+    font-size: clamp(0.42rem, 0.48rem + min(1.05vw, 1.45dvh), 1.05rem);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.02em;
@@ -167,11 +245,11 @@ col.matrix-col-label {
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    flex: 0 0 clamp(1.85rem, 4vw, 3.1rem);
-    width: clamp(1.85rem, 4vw, 3.1rem);
-    min-width: clamp(1.85rem, 4vw, 3.1rem);
+    flex: 0 0 clamp(1.05rem, min(3.2vw, 4.2dvh), 3.1rem);
+    width: clamp(1.05rem, min(3.2vw, 4.2dvh), 3.1rem);
+    min-width: clamp(1.05rem, min(3.2vw, 4.2dvh), 3.1rem);
     text-align: right;
-    font-size: clamp(1.45rem, 3.5vw, 2.65rem);
+    font-size: clamp(0.82rem, min(2.6vw, 3.5dvh), 2.65rem);
     font-weight: 700;
     line-height: 1;
     color: #000;
@@ -183,7 +261,7 @@ col.matrix-col-label {
 .matrix-cell {
     position: relative;
     padding: 0 !important;
-    min-height: clamp(2.5rem, 5vw, 3.75rem);
+    min-height: clamp(1.35rem, min(3.5vw, 4.8dvh), 3.75rem);
     background: #d4d4d4;
     isolation: isolate;
 }
@@ -201,7 +279,7 @@ col.matrix-col-label {
 .matrix-cell__hit {
     position: relative;
     z-index: 1;
-    min-height: clamp(2.5rem, 5vw, 3.75rem);
+    min-height: clamp(1.35rem, min(3.5vw, 4.8dvh), 3.75rem);
     width: 100%;
     background: transparent;
     transition: box-shadow 0.2s ease;

@@ -61,27 +61,27 @@
     </style>
     <script th:src="@{/vendor/vue.global.prod.js}"></script>
 </head>
-<body class="bg-[#FFF9F2] text-gray-900 h-screen overflow-hidden flex flex-col">
+<body class="bg-[#FFF9F2] text-gray-900 h-[100dvh] max-h-[100dvh] min-h-0 min-w-0 overflow-hidden flex flex-col">
 
 <!-- Ensures Tailwind JIT sees utilities used only from Vue :class -->
-<div aria-hidden="true" class="hidden sr-only font-bold border border-gray-200 bg-gray-50 border-2 border-[#E6D82A] bg-[#FFF23E] border-[#4a9e44] bg-[#63BE5B] border-[#3d42b3] bg-[#4A54CF] hover:brightness-[0.97] brightness-[0.97] border-[#FFF23E]/60 border-[#63BE5B]/60 border-[#4A54CF]/60 bg-[#FFF23E]/20 bg-[#63BE5B]/20 bg-[#4A54CF]/20 text-gray-950 group/row group-hover/row:bg-gray-200 z-[60] hover:z-[35] translate-y-1.5 -translate-y-1.5 mb-1.5 mt-1.5 min-w-[7.5rem] min-w-[960px] max-w-[10.5rem] max-w-[min(10.5rem,calc(100vw-1rem))] max-w-[min(7.5rem,32vw)] max-h-[min(7.5rem,32vw)] break-words flex-[1_1_12rem] left-auto right-0 left-0 right-auto w-px h-4 bg-gray-200"></div>
+<div aria-hidden="true" class="hidden sr-only font-bold border border-gray-200 bg-gray-50 border-2 border-[#E6D82A] bg-[#FFF23E] border-[#4a9e44] bg-[#63BE5B] border-[#3d42b3] bg-[#4A54CF] hover:brightness-[0.97] brightness-[0.97] border-[#FFF23E]/60 border-[#63BE5B]/60 border-[#4A54CF]/60 bg-[#FFF23E]/20 bg-[#63BE5B]/20 bg-[#4A54CF]/20 text-gray-950 group/row group-hover/row:bg-gray-200 z-[60] hover:z-[35] translate-y-1.5 -translate-y-1.5 mb-1.5 mt-1.5 min-w-[7.5rem] max-w-[10.5rem] max-w-[min(10.5rem,calc(100vw-1rem))] max-w-[min(7.5rem,32vw)] max-h-[min(7.5rem,32vw)] break-words flex-[1_1_12rem] left-auto right-0 left-0 right-auto w-px h-4 bg-gray-200"></div>
 
-<div id="app" class="h-screen flex flex-col min-h-0" v-cloak
+<div id="app" class="h-[100dvh] max-h-[100dvh] flex flex-col min-h-0 min-w-0" v-cloak
      th:attr="data-modbus-connected=${modbusConnected},data-modbus-error=${modbusError != null ? modbusError : ''},data-alert-repeat-interval-minutes=${alertRepeatIntervalMinutes},data-alert-max-repeats=${alertMaxRepeats},data-alert-gap-ms=${alertGapMs}">
 
     <!-- Top bar -->
-    <header class="app-nav-bar px-4 sm:px-8 py-4 sm:py-6 flex flex-wrap items-center justify-between shrink-0 relative z-20 gap-x-4 gap-y-3 sm:gap-x-7 sm:gap-y-4 min-w-0">
-        <div class="flex items-center gap-3 sm:gap-6 min-w-0 flex-[1_1_12rem]">
-            <img th:src="@{/images/app-logo.svg}" alt="App Logo" class="w-14 h-14 sm:w-16 sm:h-16 shrink-0"/>
+    <header class="dashboard-header app-nav-bar flex flex-wrap items-center justify-between shrink-0 relative z-20 min-w-0 max-w-full">
+        <div class="dashboard-header-brand flex items-center min-w-0 flex-[1_1_12rem]">
+            <img th:src="@{/images/app-logo.svg}" alt="App Logo" class="dashboard-header-logo shrink-0"/>
             <div class="flex flex-col justify-center min-w-0 max-w-xl lg:max-w-2xl">
-                <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-gray-950 leading-tight">Unicharm India Pvt. Ltd.</h1>
-                <div class="text-sm sm:text-base text-gray-500 font-normal mt-1 leading-snug">
+                <h1 class="dashboard-header-title font-bold tracking-tight text-gray-950 leading-tight">Unicharm India Pvt. Ltd.</h1>
+                <div class="dashboard-header-address text-gray-500 font-normal leading-snug">
                     <th:block th:replace="~{fragments/company-brand :: addressLines}"/>
                 </div>
             </div>
         </div>
 
-        <div class="flex flex-wrap items-center justify-end gap-3 sm:gap-7 min-w-0 shrink-0 max-w-full">
+        <div class="dashboard-header-tools flex flex-wrap items-center justify-end min-w-0 shrink-0 max-w-full">
             <div v-if="modbusConnected" class="hidden sm:inline-flex items-center gap-3 px-4 py-2.5 rounded-full bg-emerald-50 border border-emerald-200 shadow-sm">
                 <span class="relative flex h-3 w-3">
                     <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -144,30 +144,30 @@
                 </span>
             </div>
 
-            <div class="flex flex-col items-end gap-1.5 shrink-0">
-                <div class="flex items-center gap-2 sm:gap-4">
+            <div class="dashboard-header-user flex flex-col items-end shrink-0">
+                <div class="dashboard-header-user-row flex items-center">
                     <button
                             type="button"
-                            class="uc-motion p-2 sm:p-3.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg border border-transparent hover:border-gray-200 flex items-center justify-center"
+                            class="dashboard-header-speaker-btn uc-motion text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg border border-transparent hover:border-gray-200 flex items-center justify-center"
                             :title="playingKey != null ? 'Audio playing' : 'Audio idle'">
                         <img v-if="playingKey != null"
                              :src="speakerPlayingSrc"
-                             class="speaker-playing-icon w-20 h-20 sm:w-[6.875rem] sm:h-[6.875rem] md:w-[7.5rem] md:h-[7.5rem] shrink-0 object-contain max-w-[min(7.5rem,32vw)] max-h-[min(7.5rem,32vw)] sm:max-w-none sm:max-h-none"
+                             class="speaker-playing-icon dashboard-header-speaker shrink-0 object-contain"
                              alt="Audio playing"
                              aria-hidden="true"/>
                         <img v-else
                              th:src="@{/images/speaker-idle.png}"
                              src="/images/speaker-idle.png"
-                             class="w-20 h-20 sm:w-[6.875rem] sm:h-[6.875rem] md:w-[7.5rem] md:h-[7.5rem] shrink-0 object-contain max-w-[min(7.5rem,32vw)] max-h-[min(7.5rem,32vw)] sm:max-w-none sm:max-h-none"
+                             class="dashboard-header-speaker shrink-0 object-contain"
                              alt="Audio idle"
                              aria-hidden="true"/>
                     </button>
-                    <a th:href="@{/login}" class="uc-motion flex items-center gap-2.5 sm:gap-3 px-5 sm:px-6 py-3 sm:py-3.5 bg-[#111111] text-white rounded-lg hover:bg-black active:scale-[0.98] shadow-sm text-base sm:text-lg font-bold tracking-wide">
-                        <iconify-icon icon="solar:login-2-linear" class="text-xl sm:text-2xl" stroke-width="1.5"></iconify-icon>
+                    <a th:href="@{/login}" class="dashboard-login-btn uc-motion flex items-center bg-[#111111] text-white rounded-lg hover:bg-black active:scale-[0.98] shadow-sm font-bold tracking-wide">
+                        <iconify-icon icon="solar:login-2-linear" class="dashboard-login-icon" stroke-width="1.5"></iconify-icon>
                         <span class="hidden sm:inline">Login</span>
                     </a>
                 </div>
-                <span class="inline-flex items-center rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-semibold tracking-[0.08em] text-gray-700 shadow-sm whitespace-nowrap"
+                <span class="dashboard-mode-pill inline-flex items-center rounded-full border border-gray-200 bg-white font-semibold tracking-[0.08em] text-gray-700 shadow-sm whitespace-nowrap"
                       role="status"
                       :aria-label="mode === 'MAINTENANCE' ? 'Maintenance mode' : 'Production mode'">
                     {{ mode === 'MAINTENANCE' ? 'Maintenance Mode' : 'Production Mode' }}
@@ -176,12 +176,12 @@
         </div>
     </header>
 
-    <p v-if="modbusError" class="shrink-0 px-4 sm:px-6 py-2.5 text-sm font-semibold text-amber-950 bg-amber-50/90 border-b border-amber-100">{{ modbusError }}</p>
+    <p v-if="modbusError" class="dashboard-alert-bar shrink-0 font-semibold text-amber-950 bg-amber-50/90 border-b border-amber-100">{{ modbusError }}</p>
 
-    <main class="uc-page-enter flex-1 w-full max-w-[1920px] mx-auto px-4 md:px-6 lg:px-8 pt-2 md:pt-3 pb-4 md:pb-6 flex flex-col gap-1.5 md:gap-2 overflow-y-auto min-h-0">
+    <main class="dashboard-main uc-page-enter flex-1 w-full max-w-[1920px] mx-auto flex flex-col overflow-y-auto min-h-0 min-w-0">
 
-        <div class="shrink-0 flex justify-center px-2 pt-0 pb-0 w-full min-w-0 overflow-x-auto">
-            <div class="flex flex-col items-center gap-2 text-center">
+        <div class="dashboard-title-wrap shrink-0 flex justify-center w-full min-w-0 overflow-x-hidden">
+            <div class="flex flex-col items-center text-center">
                 <p class="dashboard-project-title text-center font-bold uppercase tracking-[0.12em] leading-tight"
                    aria-label="Production Calling System">
                     Production Calling System
@@ -195,9 +195,9 @@
         </div>
 
         <template v-else>
-            <div class="flex-1 flex flex-col items-center justify-start w-full min-h-0 pt-0 pb-2 md:pb-3">
+            <div class="dashboard-matrix-block flex-1 flex flex-col items-center justify-start w-full min-h-0 min-w-0">
             <div class="matrix-scroll w-full max-w-[min(100%,1600px)] mx-auto min-w-0 rounded-none md:rounded-sm border-0 shadow-none">
-                <table class="matrix-table min-w-[960px]" aria-label="Production line matrix">
+                <table class="matrix-table w-full min-w-0 max-w-full" aria-label="Production line matrix">
                     <colgroup>
                         <col class="matrix-col-label"/>
                         <col v-for="ws in workstations" :key="'cg-' + ws.id"/>
