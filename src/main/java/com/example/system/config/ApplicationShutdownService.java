@@ -17,6 +17,7 @@ public class ApplicationShutdownService {
     private static final Logger log = LoggerFactory.getLogger(ApplicationShutdownService.class);
 
     private final ConfigurableApplicationContext context;
+    private final CooperativeShutdownGate cooperativeShutdownGate;
     private final AtomicBoolean shutdownScheduled = new AtomicBoolean(false);
 
     /** Gives the browser time to receive the shutdown-ack response before the process exits. */
@@ -24,8 +25,10 @@ public class ApplicationShutdownService {
 
     public ApplicationShutdownService(
             ConfigurableApplicationContext context,
+            CooperativeShutdownGate cooperativeShutdownGate,
             @Value("${system.shutdown.delay-ms:2000}") long shutdownDelayMs) {
         this.context = context;
+        this.cooperativeShutdownGate = cooperativeShutdownGate;
         this.shutdownDelayMs = Math.max(200L, shutdownDelayMs);
     }
 
@@ -38,6 +41,7 @@ public class ApplicationShutdownService {
             log.info("Shutdown already scheduled; ignoring duplicate request.");
             return;
         }
+        cooperativeShutdownGate.markShuttingDown();
         Thread t = new Thread(this::exitAfterDelay, "pcs-shutdown");
         t.setDaemon(false);
         t.start();

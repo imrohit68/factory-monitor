@@ -2,6 +2,7 @@ package com.example.system.service;
 
 import com.example.system.config.ApplicationOperationMode;
 import com.example.system.config.AppProperties;
+import com.example.system.config.CooperativeShutdownGate;
 import com.example.system.config.ModbusProperties;
 import com.example.system.domain.WorkstationSlot;
 import com.example.system.dto.DashboardActiveAlertSlot;
@@ -31,6 +32,7 @@ public class OrchestrationService {
 
     private final ModbusProperties modbus;
     private final ModbusMasterService modbusMaster;
+    private final CooperativeShutdownGate cooperativeShutdownGate;
     private final ApplicationOperationMode applicationOperationMode;
     private final EventPersistenceService persistence;
     private final SimulationInputService simulationInputService;
@@ -47,6 +49,7 @@ public class OrchestrationService {
     public OrchestrationService(
             ModbusProperties modbus,
             ModbusMasterService modbusMaster,
+            CooperativeShutdownGate cooperativeShutdownGate,
             ApplicationOperationMode applicationOperationMode,
             EventPersistenceService persistence,
             SimulationInputService simulationInputService,
@@ -56,6 +59,7 @@ public class OrchestrationService {
             DashboardAlertAudioDirectorService dashboardAlertAudioDirectorService) {
         this.modbus = modbus;
         this.modbusMaster = modbusMaster;
+        this.cooperativeShutdownGate = cooperativeShutdownGate;
         this.applicationOperationMode = applicationOperationMode;
         this.persistence = persistence;
         this.simulationInputService = simulationInputService;
@@ -67,6 +71,9 @@ public class OrchestrationService {
 
     @Scheduled(fixedDelayString = "${system.modbus.poll-interval-ms:5000}")
     public void poll() {
+        if (cooperativeShutdownGate.isShuttingDown()) {
+            return;
+        }
         List<WorkstationSlot> slots = workstationService.getOrchestrationSlots();
         if (slots.isEmpty()) {
             channelBySlotId.clear();

@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import com.example.system.config.CooperativeShutdownGate;
 import com.example.system.config.ModbusProperties;
 import com.ghgande.j2mod.modbus.facade.ModbusSerialMaster;
 import com.ghgande.j2mod.modbus.procimg.InputRegister;
@@ -32,6 +33,7 @@ public class ModbusMasterService {
     }
 
     private final ModbusProperties props;
+    private final CooperativeShutdownGate cooperativeShutdownGate;
     private final ReentrantLock lock = new ReentrantLock();
 
     private ModbusSerialMaster master;
@@ -47,8 +49,9 @@ public class ModbusMasterService {
     /** Only updated while holding {@link #lock} during read paths or cleared in {@link #disconnectUnlocked}. */
     private int consecutiveReadFailures;
 
-    public ModbusMasterService(ModbusProperties props) {
+    public ModbusMasterService(ModbusProperties props, CooperativeShutdownGate cooperativeShutdownGate) {
         this.props = props;
+        this.cooperativeShutdownGate = cooperativeShutdownGate;
     }
 
     public boolean isConnected() {
@@ -60,6 +63,9 @@ public class ModbusMasterService {
     }
 
     public void ensureConnected() {
+        if (cooperativeShutdownGate.isShuttingDown()) {
+            return;
+        }
         lock.lock();
         try {
             if (!autoConnectEnabled) {
@@ -106,6 +112,9 @@ public class ModbusMasterService {
      * FC04 read with explicit attempt/response flags for dashboard TX/RX.
      */
     public ModbusInputReadResult readInputBitsWithOutcome(int bitCount) {
+        if (cooperativeShutdownGate.isShuttingDown()) {
+            return new ModbusInputReadResult(new boolean[bitCount], false, false);
+        }
         ensureConnected();
         if (!connected || master == null) {
             if (props.isLogEachRead()) {
@@ -201,6 +210,9 @@ public class ModbusMasterService {
             return new ModbusRelayWriteResult(false, false);
         }
         int coilIndex = relayNumber - 1;
+        if (cooperativeShutdownGate.isShuttingDown()) {
+            return new ModbusRelayWriteResult(false, false);
+        }
         ensureConnected();
         if (!connected || master == null) {
             log.warn(
@@ -252,6 +264,9 @@ public class ModbusMasterService {
      * Updates the serial port, disconnects, and attempts a new connection (used after saving device settings).
      */
     public void reconnect(String newPortName) {
+        if (cooperativeShutdownGate.isShuttingDown()) {
+            return;
+        }
         lock.lock();
         try {
             autoConnectEnabled = true;
