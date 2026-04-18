@@ -64,7 +64,7 @@
 <body class="bg-[#FFF9F2] text-gray-900 h-screen min-h-0 min-w-0 overflow-hidden flex flex-col">
 
 <!-- Ensures Tailwind JIT sees utilities used only from Vue :class -->
-<div aria-hidden="true" class="hidden sr-only font-bold border border-gray-200 bg-gray-50 border-2 border-[#E6D82A] bg-[#FFF23E] border-[#4a9e44] bg-[#63BE5B] border-[#3d42b3] bg-[#4A54CF] hover:brightness-[0.97] brightness-[0.97] border-[#FFF23E]/60 border-[#63BE5B]/60 border-[#4A54CF]/60 bg-[#FFF23E]/20 bg-[#63BE5B]/20 bg-[#4A54CF]/20 text-gray-950 group/row group-hover/row:bg-gray-200 z-[60] hover:z-[35] translate-y-1.5 -translate-y-1.5 mb-1.5 mt-1.5 min-w-[7.5rem] min-w-[960px] max-w-[10.5rem] max-w-[min(10.5rem,calc(100vw-1rem))] max-w-[min(7.5rem,32vw)] max-h-[min(7.5rem,32vw)] break-words flex-[1_1_12rem] left-auto right-0 left-0 right-auto w-px h-4 bg-gray-200"></div>
+<div aria-hidden="true" class="hidden sr-only font-bold border border-gray-200 bg-gray-50 border-2 border-[#E6D82A] bg-[#FFF23E] border-[#4a9e44] bg-[#63BE5B] border-[#3d42b3] bg-[#4A54CF] hover:brightness-[0.97] brightness-[0.97] border-[#FFF23E]/60 border-[#63BE5B]/60 border-[#4A54CF]/60 bg-[#FFF23E]/20 bg-[#63BE5B]/20 bg-[#4A54CF]/20 text-gray-950 text-red-700 bg-red-50/95 border-red-200/90 group/row group-hover/row:bg-gray-200 z-[60] hover:z-[35] translate-y-1.5 -translate-y-1.5 mb-1.5 mt-1.5 min-w-[7.5rem] min-w-[960px] max-w-[10.5rem] max-w-[min(10.5rem,calc(100vw-1rem))] max-w-[min(7.5rem,32vw)] max-h-[min(7.5rem,32vw)] break-words flex-[1_1_12rem] left-auto right-0 left-0 right-auto w-px h-4 bg-gray-200"></div>
 
 <div id="app" class="h-screen flex flex-col min-h-0 min-w-0" v-cloak
      th:attr="data-modbus-connected=${modbusConnected},data-modbus-error=${modbusError != null ? modbusError : ''},data-alert-repeat-interval-minutes=${alertRepeatIntervalMinutes},data-alert-max-repeats=${alertMaxRepeats},data-alert-gap-ms=${alertGapMs}">
@@ -182,8 +182,6 @@
         </div>
     </header>
 
-    <p v-if="modbusError" class="dashboard-alert-bar shrink-0 font-semibold text-amber-950 bg-amber-50/90 border-b border-amber-100">{{ modbusError }}</p>
-
     <main class="dashboard-main uc-page-enter flex-1 w-full max-w-[1920px] mx-auto flex flex-col overflow-y-auto min-h-0 min-w-0">
 
         <div class="dashboard-title-wrap shrink-0 flex justify-center w-full min-w-0 overflow-x-auto">
@@ -279,6 +277,11 @@
             </div>
         </template>
     </main>
+
+    <p
+            v-if="modbusError"
+            class="dashboard-alert-bar font-semibold text-red-700 bg-red-50/95 border-t border-b border-red-200/90"
+            role="alert">{{ modbusError }}</p>
 </div>
 
 <script th:src="@{/js/dashboard/dashboard-app.js}"></script>
