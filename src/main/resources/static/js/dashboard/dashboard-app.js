@@ -107,6 +107,9 @@
                     return;
                 }
                 this.stopSpeakerAnimation();
+            },
+            workstations() {
+                this.$nextTick(() => this.syncMatrixLayout());
             }
         },
         mounted() {
@@ -127,6 +130,17 @@
             };
             window.addEventListener('beforeunload', this._beforeUnloadHandler);
             window.addEventListener('pagehide', this._beforeUnloadHandler);
+
+            this._matrixLayoutOnResize = () => {
+                if (this._matrixLayoutTimer != null) {
+                    clearTimeout(this._matrixLayoutTimer);
+                }
+                this._matrixLayoutTimer = setTimeout(() => this.syncMatrixLayout(), 100);
+            };
+            this.$nextTick(() => {
+                this.setupMatrixLayoutObserver();
+                this.syncMatrixLayout();
+            });
         },
         beforeUnmount() {
             this.stopSpeakerAnimation();
@@ -148,8 +162,72 @@
                 clearTimeout(this._modbusLampFlashTimer);
                 this._modbusLampFlashTimer = null;
             }
+            if (this._matrixResizeObserver) {
+                this._matrixResizeObserver.disconnect();
+                this._matrixResizeObserver = null;
+            }
+            if (this._matrixLayoutOnResize) {
+                window.removeEventListener('resize', this._matrixLayoutOnResize);
+            }
+            if (this._matrixLayoutTimer != null) {
+                clearTimeout(this._matrixLayoutTimer);
+                this._matrixLayoutTimer = null;
+            }
         },
         methods: {
+            setupMatrixLayoutObserver() {
+                const block = document.querySelector('.dashboard-matrix-block');
+                if (!block) {
+                    return;
+                }
+                if (typeof ResizeObserver !== 'undefined') {
+                    this._matrixResizeObserver = new ResizeObserver(() => {
+                        this.syncMatrixLayout();
+                    });
+                    this._matrixResizeObserver.observe(block);
+                }
+                window.addEventListener('resize', this._matrixLayoutOnResize);
+            },
+            syncMatrixLayout() {
+                const block = document.querySelector('.dashboard-matrix-block');
+                if (!block) {
+                    return;
+                }
+                const cols = Array.isArray(this.workstations) ? this.workstations.length : 0;
+                if (cols === 0) {
+                    block.classList.remove('dashboard-matrix-block--sized');
+                    block.style.removeProperty('--matrix-cell-px');
+                    block.style.removeProperty('--matrix-table-width');
+                    return;
+                }
+
+                const LABEL_PX = 200;
+                const BORDER_PX = 6;
+                const DATA_ROWS = 3;
+                const HEADER_ROWS = 1;
+                const ROW_UNITS = DATA_ROWS + HEADER_ROWS;
+                const MIN_CELL = 36;
+                const MAX_CELL = 280;
+
+                const rect = block.getBoundingClientRect();
+                const availW = rect.width;
+                const availH = rect.height;
+                if (availW < 80 || availH < 80) {
+                    return;
+                }
+
+                const borderBudgetW = BORDER_PX * (cols + 2);
+                const borderBudgetH = BORDER_PX * (ROW_UNITS + 2);
+                const fromWidth = (availW - LABEL_PX - borderBudgetW) / cols;
+                const fromHeight = (availH - borderBudgetH) / ROW_UNITS;
+                let size = Math.floor(Math.min(fromWidth, fromHeight));
+                size = Math.max(MIN_CELL, Math.min(MAX_CELL, size));
+
+                const tableWidth = LABEL_PX + cols * size + borderBudgetW;
+                block.style.setProperty('--matrix-cell-px', size + 'px');
+                block.style.setProperty('--matrix-table-width', tableWidth + 'px');
+                block.classList.add('dashboard-matrix-block--sized');
+            },
             modbusLampClass(part) {
                 const k = this.modbusLampFlash[part];
                 if (k === 'g') return 'modbus-traffic__bulb--flash-green';
@@ -598,6 +676,7 @@
                     if (pollMs > 0) {
                         this.scheduleModbusLampFlashes(readTx, readRx, writeTx, writeRx);
                     }
+                    this.$nextTick(() => this.syncMatrixLayout());
                 } catch (e) {
                     console.error('Dashboard refresh error:', e);
                 } finally {

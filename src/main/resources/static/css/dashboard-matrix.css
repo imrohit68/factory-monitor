@@ -192,13 +192,46 @@ col.matrix-col-label {
     overflow: hidden;
     isolation: isolate;
 }
+/* Square fallback (padding % = width in table cells; works in JavaFX WebView). Sized mode uses --matrix-cell-px from JS. */
 .matrix-cell::before {
     content: "";
     display: block;
     width: 100%;
-    min-height: clamp(2.5rem, 5vw, 3.75rem);
+    height: 0;
+    padding-bottom: 100%;
     pointer-events: none;
     background: transparent;
+}
+.dashboard-matrix-block--sized .matrix-cell {
+    min-height: 0;
+}
+.dashboard-matrix-block--sized .matrix-cell::before {
+    height: var(--matrix-cell-px);
+    padding-bottom: 0;
+}
+.dashboard-matrix-block--sized .matrix-table {
+    width: var(--matrix-table-width);
+    max-width: 100%;
+    min-width: 0;
+}
+.dashboard-matrix-block--sized .matrix-table col:not(.matrix-col-label) {
+    width: var(--matrix-cell-px);
+}
+.dashboard-matrix-block--sized .matrix-table thead th:not(.matrix__corner) {
+    min-height: var(--matrix-cell-px);
+    padding-block: 0.2rem;
+}
+.dashboard-matrix-block--sized .matrix-table thead th.matrix__corner {
+    min-height: var(--matrix-cell-px);
+}
+.dashboard-matrix-block--sized .matrix-table thead th.matrix__corner .matrix__corner-inner {
+    min-height: calc(var(--matrix-cell-px) - 0.5rem);
+}
+.dashboard-matrix-block--sized .matrix__label {
+    min-height: var(--matrix-cell-px);
+}
+.dashboard-matrix-block--sized .matrix__label-inner {
+    min-height: calc(var(--matrix-cell-px) - 0.75rem);
 }
 .matrix-cell__hit {
     position: absolute;
@@ -455,5 +488,14 @@ col.matrix-col-label {
     padding-inline: clamp(0.35rem, 2vw, 0.5rem);
 }
 #app .dashboard-matrix-block {
-    padding-block: clamp(0.35rem, 1.5vh, 1rem);
+    padding-block: clamp(0.25rem, 0.8vh, 0.65rem);
+}
+#app .dashboard-matrix-block .matrix-scroll {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 0;
+    width: 100%;
 }
