@@ -4,7 +4,10 @@ import com.example.system.config.ApplicationOperationMode;
 import com.example.system.config.AppProperties;
 import com.example.system.config.OperationMode;
 import com.example.system.domain.EventRecord;
+import com.example.system.domain.Workstation;
+import com.example.system.domain.WorkstationSlot;
 import com.example.system.repository.EventLogRepository;
+import com.example.system.repository.WorkstationRepository;
 import com.lowagie.text.Chunk;
 import com.lowagie.text.Document;
 import com.lowagie.text.DocumentException;
@@ -34,8 +37,10 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
 import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -47,6 +52,7 @@ public class EventExportService {
     private static final DateTimeFormatter EXPORT_LOCAL_TIME = DateTimeFormatter.ofPattern("HH:mm:ss");
 
     private final EventLogRepository events;
+    private final WorkstationRepository workstations;
     private final AppProperties app;
     private final ApplicationOperationMode applicationOperationMode;
 
@@ -115,16 +121,17 @@ public class EventExportService {
 
     private void writeCsvBody(List<EventRecord> rows, OutputStream out) throws IOException {
         ZoneId zone = ZoneId.systemDefault();
+        Map<Long, String> workStationBySlotId = resolveWorkStationLabelsBySlotId();
         try (OutputStreamWriter w = new OutputStreamWriter(out, StandardCharsets.UTF_8)) {
             w.write('\uFEFF');
             w.write(exportTitleLine());
             w.write('\n');
             w.write('\n');
-            w.write("id,mapping_id,input_bit_index,output_slave_id,output_channel,status,event_date,event_time\n");
+            w.write("id,work_station,input_bit_index,output_slave_id,output_channel,status,event_date,event_time\n");
             for (EventRecord e : rows) {
                 w.write(Long.toString(e.getId()));
                 w.write(',');
-                w.write(e.getMappingId() == null ? "" : Long.toString(e.getMappingId()));
+                w.write(escapeCsv(workStationLabelFor(e.getMappingId(), workStationBySlotId)));
                 w.write(',');
                 w.write(Integer.toString(e.getInputBitIndex()));
                 w.write(',');
@@ -190,6 +197,7 @@ public class EventExportService {
             Font cellFont = FontFactory.getFont(FontFactory.HELVETICA, 7.5f);
 
             ZoneId zone = ZoneId.systemDefault();
+            Map<Long, String> workStationBySlotId = resolveWorkStationLabelsBySlotId();
             PdfPTable table = new PdfPTable(8);
             table.setWidthPercentage(100);
             table.setWidths(new float[] {0.65f, 1.0f, 0.85f, 1.0f, 1.0f, 0.85f, 1.15f, 1.7f});
@@ -197,7 +205,7 @@ public class EventExportService {
 
             String[] headers = {
                 "ID",
-                "Mapping ID",
+                "Work Station",
                 "Input bit",
                 "Output slave",
                 "Output channel",
@@ -215,7 +223,7 @@ public class EventExportService {
                 Color bg = (i % 2 == 0) ? Color.WHITE : ROW_ALT;
                 table.addCell(dataCell(Long.toString(e.getId()), cellFont, bg));
                 table.addCell(
-                        dataCell(e.getMappingId() == null ? "" : Long.toString(e.getMappingId()), cellFont, bg));
+                        dataCell(workStationLabelFor(e.getMappingId(), workStationBySlotId), cellFont, bg));
                 table.addCell(dataCell(Integer.toString(e.getInputBitIndex()), cellFont, bg));
                 table.addCell(dataCell(Integer.toString(e.getOutputSlaveId()), cellFont, bg));
                 table.addCell(dataCell(Integer.toString(e.getOutputChannel()), cellFont, bg));
@@ -237,6 +245,46 @@ public class EventExportService {
     private static String formatPdfPeriodLine(LocalDate start, LocalDate end) {
         DateTimeFormatter df = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(PDF_LOCALE);
         return start.format(df) + " – " + end.format(df);
+    }
+
+    /**
+     * Resolves each workstation slot id ({@code event_log.mapping_id}) to the export Work Station label
+     * derived from the parent workstation name ({@code BC}/{@code FC} prefix).
+     */
+    private Map<Long, String> resolveWorkStationLabelsBySlotId() {
+        Map<Long, String> bySlotId = new HashMap<>();
+        for (Workstation w : workstations.findAllByOrderBySortOrderAscIdAsc()) {
+            String label = formatWorkstationExportName(w.getName());
+            for (WorkstationSlot slot : w.getSlots()) {
+                bySlotId.put(slot.getId(), label);
+            }
+        }
+        return bySlotId;
+    }
+
+    private static String workStationLabelFor(Long mappingId, Map<Long, String> workStationBySlotId) {
+        if (mappingId == null) {
+            return "";
+        }
+        return workStationBySlotId.getOrDefault(mappingId, "");
+    }
+
+    /**
+     * Work Station export label: {@code FC21}/{@code FC22} for names 21 and 22; otherwise {@code BC}
+     * plus the workstation name (e.g. {@code BC1}).
+     */
+    static String formatWorkstationExportName(String name) {
+        if (name == null) {
+            return "";
+        }
+        String trimmed = name.trim();
+        if (trimmed.isEmpty()) {
+            return "";
+        }
+        if ("21".equals(trimmed) || "22".equals(trimmed)) {
+            return "FC" + trimmed;
+        }
+        return "BC" + trimmed;
     }
 
     private static PdfPCell headerCell(String text, Font font) {
